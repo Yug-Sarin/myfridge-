@@ -411,6 +411,7 @@ export default function App() {
   const [chefCategory, setChefCategory] = useState('Popular');
   const [activeChefRecipe, setActiveChefRecipe] = useState(null);
   const [chefStep, setChefStep] = useState(0);
+  const [chefReadAloud, setChefReadAloud] = useState(false);
   const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to MyFridge. Ask what is in your fridge, how much of an item you have, what is expiring, recipe ideas, calories, or missing ingredients. Replies use local demo logic; no AI service is connected.' }]);
   const [input, setInput] = useState('');
   const [cart, setCart] = useState([]);
@@ -790,6 +791,11 @@ export default function App() {
   const speakReply = () => {
     if (!speakText(voice.reply)) return flash('Audio playback is not available in this browser');
   };
+  const readChefStep = (stepIndex) => {
+    if (!activeChefRecipe || !speakText(activeChefRecipe.steps[stepIndex])) {
+      flash('An English Google voice is not available in this browser');
+    }
+  };
 
   const RecipeCard = ({ r }) => {
     const s = recipeScore(r);
@@ -976,13 +982,17 @@ export default function App() {
 
                   {activeChefRecipe ? (
                     <div className="mt-4 space-y-4">
-                      <button onClick={() => { setActiveChefRecipe(null); setChefStep(0); }} className="text-[14px] font-semibold" style={{ color: BLUE }}>‹ Back to recipes</button>
+                      <button onClick={() => { window.speechSynthesis?.cancel(); setChefReadAloud(false); setActiveChefRecipe(null); setChefStep(0); }} className="text-[14px] font-semibold" style={{ color: BLUE }}>‹ Back to recipes</button>
                       <section className="rounded-[18px] bg-white p-4 md:p-6">
                         <div className="flex items-start gap-3">
                           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#F2F2F7] text-[28px]">{activeChefRecipe.emoji}</span>
                           <div className="min-w-0 flex-1"><h2 className="text-[20px] font-bold leading-tight">{activeChefRecipe.name}</h2><p className="mt-1 text-[13px] text-[#6C6C70]">{activeChefRecipe.time} min · serves {activeChefRecipe.serves} · demo recipe</p></div>
                         </div>
                         <div className="mt-5">
+                          <div className="mb-4 flex items-center justify-between rounded-[12px] bg-[#F7F5FF] px-3 py-2.5">
+                            <div><div className="text-[13px] font-semibold">Read steps aloud</div><div className="text-[11px] text-[#8E8E93]">Uses your selected Google voice</div></div>
+                            <Toggle on={chefReadAloud} disabled={speechVoices.length === 0} onChange={(enabled) => { setChefReadAloud(enabled); if (enabled) readChefStep(chefStep); else window.speechSynthesis?.cancel(); }} />
+                          </div>
                           <div className="mb-2 flex items-center justify-between text-[12px] font-medium text-[#6C6C70]"><span>Step {chefStep + 1} of {activeChefRecipe.steps.length}</span><span>{Math.round(((chefStep + 1) / activeChefRecipe.steps.length) * 100)}%</span></div>
                           <div className="h-1.5 overflow-hidden rounded-full bg-[#F2F2F7]"><div className="h-full rounded-full transition-all" style={{ width: `${((chefStep + 1) / activeChefRecipe.steps.length) * 100}%`, background: '#7657E8' }} /></div>
                           <div className="mt-5 min-h-[130px] rounded-[16px] bg-[#F7F5FF] p-5">
@@ -990,10 +1000,10 @@ export default function App() {
                             <p className="text-[18px] font-medium leading-relaxed">{activeChefRecipe.steps[chefStep]}</p>
                           </div>
                           <div className="mt-4 flex gap-2">
-                            <button disabled={chefStep === 0} onClick={() => setChefStep((step) => Math.max(0, step - 1))} className="flex-1 rounded-[12px] bg-[#F2F2F7] py-3 text-[14px] font-semibold disabled:opacity-40">Previous</button>
+                            <button disabled={chefStep === 0} onClick={() => { const next = Math.max(0, chefStep - 1); setChefStep(next); if (chefReadAloud) { window.speechSynthesis?.cancel(); readChefStep(next); } }} className="flex-1 rounded-[12px] bg-[#F2F2F7] py-3 text-[14px] font-semibold disabled:opacity-40">Previous</button>
                             {chefStep < activeChefRecipe.steps.length - 1
-                              ? <button onClick={() => setChefStep((step) => step + 1)} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: '#7657E8' }}>Next step</button>
-                              : <button onClick={() => { setActiveChefRecipe(null); setChefStep(0); flash('Recipe complete — enjoy!'); }} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: '#1D8A3A' }}>Finish cooking</button>}
+                              ? <button onClick={() => { const next = Math.min(activeChefRecipe.steps.length - 1, chefStep + 1); setChefStep(next); if (chefReadAloud) { window.speechSynthesis?.cancel(); readChefStep(next); } }} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: '#7657E8' }}>Next step</button>
+                              : <button onClick={() => { window.speechSynthesis?.cancel(); setChefReadAloud(false); setActiveChefRecipe(null); setChefStep(0); flash('Recipe complete — enjoy!'); }} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: '#1D8A3A' }}>Finish cooking</button>}
                           </div>
                         </div>
                       </section>
@@ -1013,7 +1023,7 @@ export default function App() {
                           return <article key={recipe.name} className="rounded-[18px] bg-white p-4 shadow-sm">
                             <div className="flex items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#F5F2FF] text-[28px]">{recipe.emoji}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap gap-1">{recipe.categories.includes('Popular') && <span className="rounded-full bg-[#FFF4DB] px-2 py-0.5 text-[10px] font-bold text-[#9B6810]">POPULAR</span>}<span className="rounded-full bg-[#F2F2F7] px-2 py-0.5 text-[10px] font-semibold text-[#6C6C70]">{recipe.time} min</span></div><h3 className="mt-1 text-[16px] font-semibold leading-tight">{recipe.name}</h3><p className="mt-1 text-[12px] text-[#8E8E93]">{recipe.serves} servings · {available}/{recipe.ingredients.length} fridge ingredients</p></div></div>
                             <div className="mt-3 flex flex-wrap gap-1">{recipe.ingredients.slice(0, 4).map((ingredient) => <span key={ingredient.kind} className="rounded-full px-2 py-1 text-[10px]" style={have(ingredient.kind) ? { background: 'rgba(52,199,89,.12)', color: '#1D8A3A' } : { background: '#F2F2F7', color: '#8E8E93' }}>{ingredient.name}</span>)}</div>
-                            <button onClick={() => { setActiveChefRecipe(recipe); setChefStep(0); }} className="mt-4 w-full rounded-[12px] py-2.5 text-[14px] font-semibold text-white" style={{ background: '#7657E8' }}>Cook step by step <ChevronRight size={15} className="ml-1 inline" /></button>
+                            <button onClick={() => { setActiveChefRecipe(recipe); setChefStep(0); if (chefReadAloud) speakText(recipe.steps[0]); }} className="mt-4 w-full rounded-[12px] py-2.5 text-[14px] font-semibold text-white" style={{ background: '#7657E8' }}>Cook step by step <ChevronRight size={15} className="ml-1 inline" /></button>
                           </article>;
                         })}
                       </div>
