@@ -32,6 +32,7 @@ The Vite build uses relative asset paths so it works both at a project URL (`use
 ## Demo controls
 
 - Use the top navigation on desktop or bottom navigation on a small screen to explore the app.
-- Add and edit food, simulate a sample scan, try preset voice commands, and use **Hear reply** for browser speech playback. The demo does not listen through a microphone.
+- Add and edit food, simulate a sample scan, tap the microphone for browser speech recognition, or use the preset prompts if your browser does not support it. **Hear reply** uses browser speech playback. Some browsers may send microphone audio to their speech service; no audio or transcript is sent to an AI backend.
+- Ask the assistant about inventory, quantities, expiration dates, calories, or recipes using ingredients you name. Responses are improved local demo logic, not a connected AI model.
 - In **Assistant → Order**, choose Uber Grocery or DoorDash as the preferred delivery app, then compare an example basket with Food Lion and Harris Teeter estimates. Prices are illustrative, with no live price feed or store integration.
 - This prototype does not connect a real camera, AI service, MCP server, external appliance, checkout, or payment method.

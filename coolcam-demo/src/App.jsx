@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store } from 'lucide-react';
 
 // ---------- date helpers ----------
@@ -380,8 +380,9 @@ export default function App() {
   const [scanning, setScanning] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voice, setVoice] = useState({ listening: false, said: '', reply: '' });
+  const recognitionRef = useRef(null);
   const [aTab, setATab] = useState('chat');
-  const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to the CoolCam AI preview. Ask about expiring food, dinner ideas, calories, or missing ingredients. Replies are simulated for this demo; no AI service is connected.' }]);
+  const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to the CoolCam assistant. Ask what is in your fridge, how much of an item you have, what is expiring, recipe ideas, calories, or missing ingredients. Replies use local demo logic; no AI service is connected.' }]);
   const [input, setInput] = useState('');
   const [cart, setCart] = useState([]);
   const [ordered, setOrdered] = useState(false);
@@ -486,6 +487,9 @@ export default function App() {
 
   const assistantReply = (q) => {
     const t = q.toLowerCase();
+    const itemForQuery = all.find((item) => [item.name, ...(KEYWORDS[item.kind] || [])].some((name) => t.includes(name.toLowerCase())));
+    const recipeKind = Object.entries(KEYWORDS).find(([kind, words]) => [kind, ...words].some((word) => t.includes(word.toLowerCase())))?.[0];
+
     if (/order|buy|missing|cart|grocer/.test(t)) {
       const miss = mcp('cart.build', ['names', 'purchases'], 'Assistant build cart');
       if (miss.length) return { text: `I can't build an order because "${miss.join(', ')}" access is turned off in Privacy.` };
@@ -493,6 +497,44 @@ export default function App() {
       setCart((c) => [...new Set([...c, ...ids])]); setOrdered(false);
       return { text: `I added ${ids.length} missing ingredients to your cart, including replacements for expired food. Review it in the Order tab. Nothing is purchased until you confirm.` };
     }
+
+    if (/do i have|do we have|is there|how much|how many|is my|are my|still good|still fresh|expired/.test(t) && itemForQuery) {
+      const needs = ['names'];
+      if (/how much|how many|quantity/.test(t)) needs.push('quantity');
+      if (/expir|fresh|good|date|last/.test(t)) needs.push('expiry');
+      const missing = mcp('inventory.lookup', needs, `Look up ${itemForQuery.name}`);
+      if (missing.length) return { text: `I can't answer because ${missing.join(' and ')} access is turned off in Privacy.` };
+      if (/how much|how many|quantity/.test(t)) return { text: `You have ${itemForQuery.qty} ${itemForQuery.unit} of ${itemForQuery.name}.` };
+      if (/expir|fresh|good|date|last/.test(t)) {
+        if (itemForQuery.days < 0) return { text: `${itemForQuery.name} expired ${-itemForQuery.days} day${itemForQuery.days === -1 ? '' : 's'} ago. Check it before using.` };
+        if (itemForQuery.days === 0) return { text: `${itemForQuery.name} expires today. Check the package before using it.` };
+        return { text: `${itemForQuery.name} is in your fridge and expires in ${itemForQuery.days} days (${fmtDate(itemForQuery.exp)}).` };
+      }
+      return { text: `Yes, ${itemForQuery.name} is in your fridge${itemForQuery.days < 0 ? ', but it is past its listed expiration date' : ''}.` };
+    }
+
+    if (/do i have|do we have|what(?:'s| is) (?:in|inside) (?:my|the) fridge|what food do i have|what do i have|show my inventory|list my food|what(?:'s| is) available/.test(t)) {
+      const needs = ['names'];
+      if (/expir|fresh|date|soon/.test(t)) needs.push('expiry');
+      if (/how many|quantity|amount/.test(t)) needs.push('quantity');
+      const missing = mcp('inventory.summary', needs, 'Summarize fridge inventory');
+      if (missing.length) return { text: `I can't show that information because ${missing.join(' and ')} access is turned off in Privacy.` };
+      if (!all.length) return { text: 'Your fridge list is empty. Add an item to get started.' };
+      const names = all.map((item) => {
+        if (/expir|fresh|date|soon/.test(t)) return `${item.name} (${expiryLabel(item.days).toLowerCase()})`;
+        if (/how many|quantity|amount/.test(t)) return `${item.qty} ${item.unit} ${item.name}`;
+        return item.name;
+      });
+      return { text: `I have ${all.length} items in your fridge: ${names.join(', ')}.` };
+    }
+
+    if (/calor/.test(t) && itemForQuery) {
+      const missing = mcp('nutrition.lookup', ['names', 'nutrition'], `Check calories for ${itemForQuery.name}`);
+      if (missing.length) return { text: `I can't answer because ${missing.join(' and ')} access is turned off in Privacy.` };
+      if (itemForQuery.cal == null) return { text: `I don't have calorie information for ${itemForQuery.name} in this sample inventory.` };
+      return { text: `${itemForQuery.name} is listed as about ${itemForQuery.cal} calories per item.` };
+    }
+
     if (/calor|light|healthy|under/.test(t)) {
       const miss = mcp('recipes.search', ['names', 'nutrition'], 'Low-calorie recipe search');
       if (miss.length) return { text: `I don't have access to "${miss.join(', ')}", so I can't filter by calories.` };
@@ -504,6 +546,16 @@ export default function App() {
       const r = RECIPES.map((x) => ({ x, s: recipeScore(x) })).filter((o) => o.s.exp > 0).sort((a, b) => b.s.exp - a.s.exp).map((o) => o.x);
       return { text: 'These recipes use food that is about to expire' + (today.length ? ` (including ${today.map((i) => i.name).join(', ')}, which expires today)` : '') + ':' + (expired.length ? ` I skipped ${expired.length} expired item${expired.length > 1 ? 's' : ''}. Please check them.` : ''), recipes: r.slice(0, 3) };
     }
+
+    if (recipeKind && /recipe|make|cook|dinner|meal|with|using/.test(t)) {
+      const missing = mcp('recipes.search', ['names'], `Find recipes using ${recipeKind}`);
+      if (missing.length) return { text: "I can't search recipes because item-name access is turned off in Privacy." };
+      const recipes = RECIPES.filter((recipe) => recipe.ing.includes(recipeKind))
+        .sort((a, b) => recipeScore(b).haveN / b.ing.length - recipeScore(a).haveN / a.ing.length);
+      if (!recipes.length) return { text: `I don't have a ${recipeKind} recipe in this demo's small recipe list yet.` };
+      return { text: `Here are ideas that use ${CATALOG[recipeKind]?.name || recipeKind}. Green ingredients are in your fridge; crossed-out ones are missing.`, recipes: recipes.slice(0, 3) };
+    }
+
     const miss = mcp('recipes.search', ['names'], 'Recipe search: "' + q.slice(0, 30) + '"');
     if (miss.length) return { text: "I can't see your item names, so I can't suggest recipes. Enable it in Privacy." };
     const r = RECIPES.map((x) => ({ x, s: recipeScore(x) })).sort((a, b) => b.s.haveN / b.x.ing.length - a.s.haveN / a.x.ing.length).map((o) => o.x);
@@ -516,33 +568,85 @@ export default function App() {
     setInput('');
   };
 
-  const voiceCmd = (cmd) => {
-    setVoice({ listening: true, said: cmd, reply: '' });
+  const voiceCmd = (cmd, source = 'preset') => {
+    setVoice({ listening: source === 'preset', processing: source === 'microphone', said: cmd, reply: '', source });
     setTimeout(() => {
       let r;
       const t = cmd.toLowerCase();
       const ex = sorted.filter((i) => i.days < 0);
       const td = sorted.filter((i) => i.days === 0);
       const so = sorted.filter((i) => i.days >= 1 && i.days <= 3);
-      if (/expir/.test(t)) {
+      if (/scan|look at|update the fridge/.test(t)) { scan(true); r = 'Scanning the shelves now. This is a sample scan; no photo is captured.'; }
+      else if (/dinner|recipe|meal/.test(t) && !premium) r = 'Recipe ideas are part of Premium. You can still ask me what food is in your fridge.';
+      else if (/expir/.test(t)) {
+        const missing = mcp('voice.inventory_lookup', ['names', 'expiry'], 'Voice question about expiring food');
+        if (missing.length) r = `I can't check that because ${missing.join(' and ')} access is turned off in Privacy.`;
+        else {
         const parts = [];
         if (ex.length) parts.push(`Already expired: ${ex.map((i) => i.name).join(', ')}.`);
         if (td.length) parts.push(`Expiring today: ${td.map((i) => i.name).join(', ')}.`);
         if (so.length) parts.push(`Expiring soon: ${so.map((i) => `${i.name} (${i.days}d)`).join(', ')}.`);
         r = parts.length ? parts.join(' ') : 'Nothing has expired or expires in the next 3 days.';
-      } else if (/milk/.test(t)) {
-        const m = all.find((i) => i.kind === 'milk');
-        r = !m ? 'No milk. Want me to add it to your list?'
-          : m.days < 0 ? `Your milk expired ${-m.days} day(s) ago. Time to toss it.`
-          : m.days === 0 ? 'Yes, you have milk, but it expires today.'
-          : `Yes, you have milk. It expires in ${m.days} days.`;
-      } else if (/scan|look|update/.test(t)) { scan(true); r = 'Scanning the shelves now.'; }
-      else if (/dinner|recipe/.test(t)) {
-        if (!premium) r = 'Recipe ideas are part of Premium. Upgrade for $10/month to unlock the AI assistant.';
-        else { const x = assistantReply('use expiring'); r = x.recipes ? 'Try ' + x.recipes[0].name + '.' : x.text; }
-      } else r = `You have ${all.length} items. ${ex.length} expired, ${td.length} expiring today, ${so.length} within the next 3 days.`;
-      setVoice({ listening: false, said: cmd, reply: r });
-    }, 1200);
+        }
+      } else {
+        const answer = assistantReply(cmd);
+        r = answer.recipes?.length ? `${answer.text} ${answer.recipes.map((recipe) => recipe.name).join('. ')}` : answer.text;
+      }
+      setVoice({ listening: false, processing: false, said: cmd, reply: r, source });
+    }, source === 'preset' ? 900 : 350);
+  };
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!window.isSecureContext) {
+      setVoice({ listening: false, processing: false, said: '', reply: 'Microphone voice input needs a secure HTTPS page. Open the GitHub Pages link and try again.', source: 'microphone' });
+      return;
+    }
+    if (!SpeechRecognition) {
+      setVoice({ listening: false, processing: false, said: '', reply: 'Live speech recognition is not available in this browser. Try Chrome or Edge, or use one of the sample prompts below.', source: 'microphone' });
+      return;
+    }
+
+    recognitionRef.current?.abort();
+    const recognition = new SpeechRecognition();
+    let receivedSpeech = false;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+    recognition.onresult = (event) => {
+      receivedSpeech = true;
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) voiceCmd(transcript, 'microphone');
+      else setVoice({ listening: false, processing: false, said: '', reply: 'I did not catch that. Try again or choose a sample prompt.' });
+    };
+    recognition.onerror = (event) => {
+      const message = event.error === 'not-allowed'
+        ? 'Microphone access was blocked. Allow it in your browser’s site settings, then try again.'
+        : event.error === 'no-speech'
+          ? 'I did not hear anything. Tap the microphone and try again.'
+          : 'Speech recognition is unavailable right now. Try a sample prompt instead.';
+      setVoice({ listening: false, processing: false, said: '', reply: message });
+    };
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setVoice((current) => current.listening && !receivedSpeech
+        ? { listening: false, processing: false, said: '', reply: 'I did not catch that. Tap the microphone and try again, or choose a sample prompt.' }
+        : current);
+    };
+    recognitionRef.current = recognition;
+    setVoice({ listening: true, processing: false, said: '', reply: '', source: 'microphone' });
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setVoice({ listening: false, processing: false, said: '', reply: 'The microphone could not start. Check browser permission and try again.' });
+    }
+  };
+  const closeVoice = () => {
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    setVoiceOpen(false);
+    setVoice((current) => ({ ...current, listening: false, processing: false }));
   };
   const speakReply = () => {
     if (!voice.reply || !('speechSynthesis' in window)) return flash('Audio playback is not available in this browser');
@@ -806,7 +910,7 @@ export default function App() {
                 <p className="text-[13px] text-[#6C6C70] mt-3 leading-snug">Product concept: photos would be processed on-device; an MCP gateway could share only the fields you allow. This prototype simulates those permission checks locally. No camera, MCP server, or AI service is connected.</p>
               </div>
 
-              <Group title="AI can access" footer="Raw images, faces and audio are always blocked and can't be turned on.">
+              <Group title="AI can access" footer="Raw images, faces and recordings are never shared with the assistant. Browser speech recognition may process microphone audio through its own service; see the voice panel before speaking.">
                 {SCOPES.map((s) => (
                   <div key={s.key} className="px-3 py-2.5 flex items-center gap-3"><div className="flex-1"><div className="text-[16px] leading-tight">{s.label}</div><div className="text-[13px] text-[#6C6C70]">{s.desc}</div></div><Toggle on={scopes[s.key]} onChange={(v) => setScopes({ ...scopes, [s.key]: v })} /></div>
                 ))}
@@ -949,14 +1053,15 @@ export default function App() {
           <div className="fixed inset-0 bg-black/30 z-20 flex items-end justify-center p-0 md:items-center md:p-6">
             <div className="sheetAnim bg-[#F2F2F7] w-full max-w-lg rounded-t-[28px] md:rounded-[24px] px-5 pt-2 pb-8">
               <div className="w-9 h-[5px] bg-black/20 rounded-full mx-auto" />
-              <div className="flex justify-between items-center mt-3"><div className="font-semibold text-[17px]">Hey Fridge</div><button onClick={() => setVoiceOpen(false)} className="w-7 h-7 rounded-full bg-[#7676801F] flex items-center justify-center"><X size={15} className="text-[#6C6C70]" /></button></div>
-              <div className="flex justify-center my-6"><div className="w-[76px] h-[76px] rounded-full flex items-center justify-center text-white" style={{ background: voice.listening ? 'linear-gradient(135deg,#FF375F,#FF9F0A)' : BLUE, animation: voice.listening ? 'pulse2 .9s infinite' : 'none', boxShadow: voice.listening ? '0 0 0 10px rgba(255,55,95,.15)' : 'none' }}><Mic size={30} /></div></div>
+              <div className="flex justify-between items-center mt-3"><div className="font-semibold text-[17px]">Hey Fridge</div><button onClick={closeVoice} aria-label="Close voice assistant" className="w-7 h-7 rounded-full bg-[#7676801F] flex items-center justify-center"><X size={15} className="text-[#6C6C70]" /></button></div>
+              <div className="flex justify-center my-6"><button onClick={startListening} disabled={voice.listening || voice.processing} aria-label="Start speaking" className="w-[76px] h-[76px] rounded-full flex items-center justify-center text-white disabled:opacity-75" style={{ background: voice.listening ? 'linear-gradient(135deg,#FF375F,#FF9F0A)' : BLUE, animation: voice.listening ? 'pulse2 .9s infinite' : 'none', boxShadow: voice.listening ? '0 0 0 10px rgba(255,55,95,.15)' : 'none' }}><Mic size={30} /></button></div>
               {voice.said && <div className="text-[17px] text-center font-medium">“{voice.said}”</div>}
-              {voice.listening && <div className="text-[14px] text-center text-[#8E8E93] mt-1">Simulating a voice command…</div>}
+              {voice.listening && <div className="text-[14px] text-center text-[#8E8E93] mt-1">{voice.source === 'microphone' ? 'Listening…' : 'Running sample command…'}</div>}
+              {voice.processing && <div className="text-[14px] text-center text-[#8E8E93] mt-1">Checking your fridge list…</div>}
               {voice.reply && <div className="bg-white rounded-[14px] p-3.5 text-[15px] mt-3 leading-snug">{voice.reply}</div>}
               {voice.reply && <button onClick={speakReply} className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold" style={{ color: BLUE }}><Volume2 size={16} />Hear reply</button>}
-              <div className="text-[13px] text-[#6C6C70] mt-5 mb-2">Tap a command to simulate speaking</div>
-              <p className="mb-3 text-[12px] text-[#8E8E93]">This demo uses preset commands and sample answers. It does not access your microphone.</p>
+              <div className="text-[13px] text-[#6C6C70] mt-5 mb-2">Tap the mic and ask a question, or try a sample</div>
+              <p className="mb-3 text-[12px] text-[#8E8E93]">Microphone access starts only after you tap. Speech recognition depends on your browser and may send audio to its speech service. This demo does not send your voice to an AI service.</p>
               <div className="flex flex-wrap gap-2">{["What's expiring soon?", 'Do I have milk?', 'Scan the fridge', "What's for dinner?"].map((c) => <button key={c} onClick={() => voiceCmd(c)} className="text-[14px] bg-white rounded-full px-3.5 py-2" style={{ color: BLUE }}>{c}</button>)}</div>
             </div>
           </div>
