@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store, Users, TrendingUp } from 'lucide-react';
+import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store, Users, TrendingUp, ExternalLink } from 'lucide-react';
 
 // ---------- date helpers ----------
 const pad = (n) => String(n).padStart(2, '0');
@@ -84,11 +84,11 @@ const CATALOG = {
   pepper: { name: 'Bell peppers', price: 2.99, emoji: '🫑' },
 };
 const ORDER_PROVIDERS = [
-  { id: 'doordash', name: 'DoorDash', note: 'Grocery delivery varies by area' },
-  { id: 'instacart', name: 'Instacart', note: 'Grocery delivery varies by area' },
-  { id: 'walmart', name: 'Walmart Delivery', note: 'Walmart grocery delivery' },
-  { id: 'shipt', name: 'Shipt', note: 'Same-day delivery in supported areas' },
-  { id: 'ubereats', name: 'Uber Eats', note: 'Grocery delivery varies by area' },
+  { id: 'doordash', name: 'DoorDash', note: 'Grocery delivery varies by area', url: 'https://www.doordash.com/p/grocery-delivery' },
+  { id: 'instacart', name: 'Instacart', note: 'Grocery delivery varies by area', url: 'https://www.instacart.com/grocery-delivery' },
+  { id: 'walmart', name: 'Walmart Delivery', note: 'Walmart grocery delivery', url: 'https://www.walmart.com/cp/grocery/976759' },
+  { id: 'shipt', name: 'Shipt', note: 'Same-day delivery in supported areas', url: 'https://www.shipt.com/delivery' },
+  { id: 'ubereats', name: 'Uber Eats', note: 'Grocery delivery varies by area', url: 'https://www.ubereats.com/near-me/grocery' },
 ];
 const STORE_OPTIONS = [
   { id: 'foodlion', name: 'Food Lion' },
@@ -1010,7 +1010,8 @@ export default function App() {
                       <section className="rounded-[18px] bg-white p-4">
                         <h3 className="text-[15px] font-semibold">Ingredients</h3>
                         <div className="mt-3 flex flex-wrap gap-2">{activeChefRecipe.ingredients.map((ingredient) => { const inFridge = have(ingredient.kind); return <span key={ingredient.kind} className="rounded-full px-3 py-1.5 text-[12px] font-medium" style={inFridge ? { background: 'rgba(52,199,89,.14)', color: '#1D8A3A' } : { background: '#F2F2F7', color: '#6C6C70' }}>{inFridge ? '✓ ' : '○ '}{ingredient.name}</span>; })}</div>
-                        <p className="mt-3 text-[11px] text-[#8E8E93]">Green means listed in your fridge. Any missing pantry ingredients are for the demo recipe.</p>
+                        <p className="mt-3 text-[11px] text-[#8E8E93]">Green means listed in your fridge; gray means missing.</p>
+                        {activeChefRecipe.ingredients.some((ingredient) => !have(ingredient.kind)) && <button onClick={() => { const missingIds = activeChefRecipe.ingredients.filter((ingredient) => !have(ingredient.kind)).map((ingredient) => ingredient.kind); addToCart(missingIds); if (scopes.names && scopes.purchases) setATab('order'); }} className="mt-3 w-full rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: BLUE }}><ShoppingCart size={16} className="mr-1.5 inline" />Add missing ingredients to cart</button>}
                       </section>
                     </div>
                   ) : (
@@ -1081,8 +1082,11 @@ export default function App() {
                       ))}
                       <div className="flex justify-between px-3 py-3 font-semibold text-[16px]"><span>Estimated item subtotal · {ORDER_PROVIDERS.find((p) => p.id === orderProvider).name}</span><span>${cartSubtotal(orderProvider).toFixed(2)}</span></div>
                     </Group>
-                    <button onClick={() => { setCart([]); setOrdered(true); addLog({ tool: 'order.demo_confirm', purpose: 'You confirmed a simulated order', shared: ['Cart contents (sample only)'], blocked: ALWAYS_BLOCKED }); }} className="w-full py-3.5 rounded-[14px] text-white font-semibold text-[17px]" style={{ background: BLUE }}>Place demo order</button>
-                    <p className="text-[13px] text-[#6C6C70] text-center -mt-1">Checkout is simulated. No payment or order is sent.</p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <button onClick={() => { setCart([]); setOrdered(true); addLog({ tool: 'order.demo_confirm', purpose: 'You confirmed a simulated in-app checkout', shared: ['Cart contents (sample only)'], blocked: ALWAYS_BLOCKED }); }} className="flex items-center justify-center gap-2 rounded-[14px] py-3.5 text-[15px] font-semibold text-white" style={{ background: BLUE }}>Checkout in MyFridge <span className="text-[10px] font-medium text-white/75">DEMO</span></button>
+                      <a href={ORDER_PROVIDERS.find((provider) => provider.id === orderProvider)?.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-[14px] border border-[#D1D1D6] bg-white py-3.5 text-[15px] font-semibold" style={{ color: BLUE }}>Open {ORDER_PROVIDERS.find((provider) => provider.id === orderProvider)?.name} <ExternalLink size={15} /></a>
+                    </div>
+                    <p className="text-[12px] leading-snug text-[#6C6C70] text-center">In-app checkout is only simulated. The service link opens separately; this demo can’t send your cart or place a real order.</p>
                   </>)}
                 </div>
               )}
