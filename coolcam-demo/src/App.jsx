@@ -427,11 +427,11 @@ export default function App() {
   useEffect(() => {
     if (!('speechSynthesis' in window)) return undefined;
     const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices().filter((candidate) => candidate.lang?.toLowerCase().startsWith('en'));
+      const voices = window.speechSynthesis.getVoices().filter((candidate) => candidate.lang?.toLowerCase().startsWith('en') && /google/i.test(candidate.name));
       setSpeechVoices(voices);
       setSpeechVoiceURI((current) => current && voices.some((candidate) => candidate.voiceURI === current)
         ? current
-        : (voices.find((candidate) => /samantha|ava|jenny|aria|karen|monica|natural|enhanced|google us english/i.test(candidate.name)) || voices.find((candidate) => candidate.default) || voices[0])?.voiceURI || '');
+        : (voices.find((candidate) => /google us english/i.test(candidate.name)) || voices[0])?.voiceURI || '');
     };
     loadVoices();
     window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
@@ -772,11 +772,11 @@ export default function App() {
     if (!text || !('speechSynthesis' in window)) return false;
     const speech = window.speechSynthesis;
     const voices = speech.getVoices();
-    const englishVoices = voices.filter((candidate) => candidate.lang?.toLowerCase().startsWith('en'));
-    const selectedVoice = englishVoices.find((candidate) => candidate.voiceURI === speechVoiceURI)
-      || englishVoices.find((candidate) => /samantha|ava|jenny|aria|karen|monica|natural|enhanced|google us english/i.test(candidate.name))
-      || englishVoices.find((candidate) => candidate.default)
-      || englishVoices[0];
+    const googleVoices = voices.filter((candidate) => candidate.lang?.toLowerCase().startsWith('en') && /google/i.test(candidate.name));
+    const selectedVoice = googleVoices.find((candidate) => candidate.voiceURI === speechVoiceURI)
+      || googleVoices.find((candidate) => /google us english/i.test(candidate.name))
+      || googleVoices[0];
+    if (!selectedVoice) return false;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     utterance.rate = 0.91;
@@ -1297,14 +1297,14 @@ export default function App() {
               {voice.reply && <button onClick={speakReply} className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold" style={{ color: BLUE }}><Volume2 size={16} />{voice.source === 'microphone' ? 'Replay reply' : 'Hear reply'}</button>}
               <div className="mt-4 rounded-[14px] bg-white p-3">
                 <label htmlFor="speech-voice" className="mb-2 block text-[12px] font-semibold text-[#6C6C70]">Spoken voice</label>
-                {speechVoices.length > 1 ? (
+                {speechVoices.length > 0 ? (
                   <div className="flex gap-2">
                     <select id="speech-voice" value={speechVoiceURI} onChange={(event) => setSpeechVoiceURI(event.target.value)} className="min-w-0 flex-1 rounded-[10px] bg-[#F2F2F7] px-3 py-2 text-[14px] outline-none">
                       {speechVoices.map((candidate) => <option key={candidate.voiceURI} value={candidate.voiceURI}>{candidate.name}{candidate.default ? ' · Default' : ''}</option>)}
                     </select>
                     <button onClick={() => speakText("Hi, I'm your MyFridge assistant. What would you like to find today?")} className="shrink-0 rounded-[10px] px-3 text-[13px] font-semibold" style={{ background: 'rgba(0,122,255,.1)', color: BLUE }}>Preview</button>
                   </div>
-                ) : <p className="text-[12px] leading-snug text-[#8E8E93]">{speechVoices.length === 1 ? `${speechVoices[0].name} is the only English voice this browser offers.` : 'Loading voices from your browser… If only one voice is available, your device controls the sound.'}</p>}
+                ) : <p className="text-[12px] leading-snug text-[#8E8E93]">No English Google voice is available in this browser. Text answers still work; spoken replies need a Google voice exposed by your browser.</p>}
               </div>
               <div className="text-[13px] text-[#6C6C70] mt-5 mb-2">Tap the mic and ask a question, or try a sample</div>
               <p className="mb-3 text-[12px] text-[#8E8E93]">Microphone access starts only after you tap. Answers to spoken questions read aloud automatically. Speech recognition depends on your browser and may send audio to its speech service; this demo does not send your voice to an AI service.</p>
