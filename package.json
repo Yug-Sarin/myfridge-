@@ -1,0 +1,12 @@
+{
+  "name": "fridge-app-demo",
+  "private": true,
+  "workspaces": [
+    "coolcam-demo"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=coolcam-demo",
+    "build": "npm run build --workspace=coolcam-demo",
+    "lint": "npm run lint --workspace=coolcam-demo"
+  }
+}
