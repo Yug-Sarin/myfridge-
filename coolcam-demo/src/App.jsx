@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store, Users, TrendingUp } from 'lucide-react';
 
 // ---------- date helpers ----------
@@ -392,6 +392,8 @@ export default function App() {
   const [scanning, setScanning] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voice, setVoice] = useState({ listening: false, said: '', reply: '' });
+  const [speechVoices, setSpeechVoices] = useState([]);
+  const [speechVoiceURI, setSpeechVoiceURI] = useState('');
   const recognitionRef = useRef(null);
   const locateTimeoutRef = useRef(null);
   const [highlightedItemId, setHighlightedItemId] = useState(null);
@@ -408,6 +410,20 @@ export default function App() {
   const [showProfileForm, setShowProfileForm] = useState(false);
   const [profileNameInput, setProfileNameInput] = useState('');
   const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return undefined;
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices().filter((candidate) => candidate.lang?.toLowerCase().startsWith('en'));
+      setSpeechVoices(voices);
+      setSpeechVoiceURI((current) => current && voices.some((candidate) => candidate.voiceURI === current)
+        ? current
+        : (voices.find((candidate) => /samantha|ava|jenny|aria|karen|monica|natural|enhanced|google us english/i.test(candidate.name)) || voices.find((candidate) => candidate.default) || voices[0])?.voiceURI || '');
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', loadVoices);
+  }, []);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 2200); };
   const all = useMemo(() => items.map((i) => ({ ...i, days: daysLeft(i.exp) })), [items]);
@@ -733,15 +749,16 @@ export default function App() {
     const speech = window.speechSynthesis;
     const voices = speech.getVoices();
     const englishVoices = voices.filter((candidate) => candidate.lang?.toLowerCase().startsWith('en'));
-    const friendlyVoice = englishVoices.find((candidate) => /samantha|ava|jenny|aria|karen|monica|google us english|natural|enhanced/i.test(candidate.name))
+    const selectedVoice = englishVoices.find((candidate) => candidate.voiceURI === speechVoiceURI)
+      || englishVoices.find((candidate) => /samantha|ava|jenny|aria|karen|monica|natural|enhanced|google us english/i.test(candidate.name))
       || englishVoices.find((candidate) => candidate.default)
       || englishVoices[0];
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
-    utterance.rate = 0.96;
-    utterance.pitch = 1.08;
+    utterance.rate = 0.91;
+    utterance.pitch = 1.12;
     utterance.volume = 1;
-    if (friendlyVoice) utterance.voice = friendlyVoice;
+    if (selectedVoice) utterance.voice = selectedVoice;
     speech.cancel();
     speech.speak(utterance);
     return true;
@@ -1193,6 +1210,17 @@ export default function App() {
               {voice.processing && <div className="text-[14px] text-center text-[#8E8E93] mt-1">Checking your fridge list…</div>}
               {voice.reply && <div className="bg-white rounded-[14px] p-3.5 text-[15px] mt-3 leading-snug">{voice.reply}</div>}
               {voice.reply && <button onClick={speakReply} className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold" style={{ color: BLUE }}><Volume2 size={16} />{voice.source === 'microphone' ? 'Replay reply' : 'Hear reply'}</button>}
+              <div className="mt-4 rounded-[14px] bg-white p-3">
+                <label htmlFor="speech-voice" className="mb-2 block text-[12px] font-semibold text-[#6C6C70]">Spoken voice</label>
+                {speechVoices.length > 1 ? (
+                  <div className="flex gap-2">
+                    <select id="speech-voice" value={speechVoiceURI} onChange={(event) => setSpeechVoiceURI(event.target.value)} className="min-w-0 flex-1 rounded-[10px] bg-[#F2F2F7] px-3 py-2 text-[14px] outline-none">
+                      {speechVoices.map((candidate) => <option key={candidate.voiceURI} value={candidate.voiceURI}>{candidate.name}{candidate.default ? ' · Default' : ''}</option>)}
+                    </select>
+                    <button onClick={() => speakText("Hi, I'm your MyFridge assistant. What would you like to find today?")} className="shrink-0 rounded-[10px] px-3 text-[13px] font-semibold" style={{ background: 'rgba(0,122,255,.1)', color: BLUE }}>Preview</button>
+                  </div>
+                ) : <p className="text-[12px] leading-snug text-[#8E8E93]">{speechVoices.length === 1 ? `${speechVoices[0].name} is the only English voice this browser offers.` : 'Loading voices from your browser… If only one voice is available, your device controls the sound.'}</p>}
+              </div>
               <div className="text-[13px] text-[#6C6C70] mt-5 mb-2">Tap the mic and ask a question, or try a sample</div>
               <p className="mb-3 text-[12px] text-[#8E8E93]">Microphone access starts only after you tap. Answers to spoken questions read aloud automatically. Speech recognition depends on your browser and may send audio to its speech service; this demo does not send your voice to an AI service.</p>
               <div className="flex flex-wrap gap-2">{["Where are the lemons?", "What's expiring soon?", 'Do I have milk?', 'Scan the fridge', "What's for dinner?"].map((c) => <button key={c} onClick={() => voiceCmd(c)} className="text-[14px] bg-white rounded-full px-3.5 py-2" style={{ color: BLUE }}>{c}</button>)}</div>
