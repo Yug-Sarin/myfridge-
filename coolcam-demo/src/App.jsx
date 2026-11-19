@@ -941,7 +941,7 @@ export default function App() {
               <div className="w-[72px] h-[72px] mx-auto rounded-[18px] flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg,#FF9F0A,#FF375F)' }}><Sparkles size={34} /></div>
               <h3 className="font-bold text-[22px] mt-5">Meet your fridge assistant</h3>
               <p className="text-[15px] text-[#6C6C70] mt-2 leading-snug">Guided cooking, recipes for every occasion, grocery planning, and a calorie tracker.</p>
-              <button onClick={() => { setPremium(true); flash('Premium unlocked (demo)'); }} className="mt-6 w-full py-3.5 rounded-[14px] text-white font-semibold text-[17px]" style={{ background: BLUE }}>Try Premium · $10/month</button>
+              <button onClick={() => { setPremium(true); flash('Premium unlocked (demo)'); }} className="mt-6 w-full py-3.5 rounded-[14px] text-white font-semibold text-[17px]" style={{ background: BLUE }}>Try Premium · $9.99/month</button>
               <p className="text-[12px] text-[#8E8E93] mt-3">Cancel anytime. Demo only.</p>
             </div>
           ) : (
@@ -1195,7 +1195,7 @@ export default function App() {
 
               {[
                 { name: 'Free', price: '$0', cur: !premium, feats: ["See what's in your fridge", 'Expiration tracking and color-coded alerts', 'Food savings dashboard when you mark items as used', 'Add and edit items and dates by hand', 'Alexa, Google Nest and more', 'Voice questions about inventory'] },
-                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI Chef with step-by-step cooking and occasion-based recipes', 'Grocery ordering and sample store comparisons', 'Calorie tracking and family profiles'], prem: true },
+                { name: 'Premium', price: '$9.99/mo', cur: premium, feats: ['Everything in Free', 'AI Chef with step-by-step cooking and occasion-based recipes', 'Grocery ordering and sample store comparisons', 'Calorie tracking and family profiles'], prem: true },
               ].map((p) => (
                 <div key={p.name} className="bg-white rounded-[16px] p-4" style={p.cur ? { outline: `2px solid ${BLUE}` } : {}}>
                   <div className="flex justify-between items-center">

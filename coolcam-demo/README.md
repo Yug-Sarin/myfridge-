@@ -6,7 +6,7 @@ MyFridge is a school project concept for a wide-angle camera that mounts on a fr
 
 - **Camera: $79.99 one time.** Wide-angle fridge-door camera concept.
 - **Free app:** fridge inventory, expiry dates, voice controls, and compatible appliance connections.
-- **MyFridge Premium: $10/month.** An AI Chef concept with step-by-step cooking and recipes for occasions, grocery ordering, an estimated food-savings dashboard, calorie tracking, and family profiles with separate meal logs and calorie goals.
+- **MyFridge Premium: $9.99/month.** An AI Chef concept with step-by-step cooking and recipes for occasions, grocery ordering, an estimated food-savings dashboard, calorie tracking, and family profiles with separate meal logs and calorie goals.
 
 These are proposed features and prices, not an active store or subscription. Camera image recognition, Alexa/Google Nest connections, grocery ordering, billing, live store prices, and production AI are not connected in this prototype. The app uses sample data and local browser state.
 
