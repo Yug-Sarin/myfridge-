@@ -1,4 +1,4 @@
-name: Deploy CoolCam to GitHub Pages
+name: Deploy MyFridge to GitHub Pages
 
 on:
   push:

@@ -1,12 +1,12 @@
-# CoolCam
+# MyFridge
 
-CoolCam is a school project concept for a wide-angle camera that mounts on a fridge door. The demo shows a sample fridge inventory, expiry reminders, voice interaction, a proposed appliance-connected free tier, and an optional AI subscription.
+MyFridge is a school project concept for a wide-angle camera that mounts on a fridge door. The demo shows a sample fridge inventory, expiry reminders, voice interaction, a proposed appliance-connected free tier, and an optional Premium subscription.
 
 ## Concept pricing
 
 - **Camera: $79.99 one time.** Wide-angle fridge-door camera concept.
 - **Free app:** fridge inventory, expiry dates, voice controls, and compatible appliance connections.
-- **CoolCam AI: $10/month.** Personalized recipe ideas, grocery ordering, and calorie tracking.
+- **MyFridge Premium: $10/month.** Personalized recipe ideas, grocery ordering, calorie tracking, and family profiles with separate meal logs and calorie goals.
 
 These are proposed features and prices, not an active store or subscription. Camera image recognition, Alexa/Google Nest connections, grocery ordering, billing, live store prices, and production AI are not connected in this prototype. The app uses sample data and local browser state.
 

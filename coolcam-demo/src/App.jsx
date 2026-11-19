@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store } from 'lucide-react';
+import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store, Users } from 'lucide-react';
 
 // ---------- date helpers ----------
 const pad = (n) => String(n).padStart(2, '0');
@@ -382,13 +382,16 @@ export default function App() {
   const [voice, setVoice] = useState({ listening: false, said: '', reply: '' });
   const recognitionRef = useRef(null);
   const [aTab, setATab] = useState('chat');
-  const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to the CoolCam assistant. Ask what is in your fridge, how much of an item you have, what is expiring, recipe ideas, calories, or missing ingredients. Replies use local demo logic; no AI service is connected.' }]);
+  const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to MyFridge. Ask what is in your fridge, how much of an item you have, what is expiring, recipe ideas, calories, or missing ingredients. Replies use local demo logic; no AI service is connected.' }]);
   const [input, setInput] = useState('');
   const [cart, setCart] = useState([]);
   const [ordered, setOrdered] = useState(false);
   const [orderProvider, setOrderProvider] = useState('uber');
   const [compareStores, setCompareStores] = useState(true);
-  const [meals, setMeals] = useState([{ name: 'Oatmeal', cal: 300 }]);
+  const [profiles, setProfiles] = useState([{ id: 'you', name: 'You', emoji: '🙂', goal: 2000, meals: [{ name: 'Oatmeal', cal: 300 }] }]);
+  const [activeProfileId, setActiveProfileId] = useState('you');
+  const [showProfileForm, setShowProfileForm] = useState(false);
+  const [profileNameInput, setProfileNameInput] = useState('');
   const [toast, setToast] = useState('');
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(''), 2200); };
@@ -398,8 +401,10 @@ export default function App() {
   const today = sorted.filter((i) => i.days === 0);
   const soon = sorted.filter((i) => i.days >= 1 && i.days <= 2);
   const have = (kind) => all.some((i) => i.kind === kind && i.qty > 0 && i.days >= 0);
+  const activeProfile = profiles.find((profile) => profile.id === activeProfileId) || profiles[0];
+  const meals = activeProfile?.meals || [];
   const eaten = meals.reduce((s, m) => s + m.cal, 0);
-  const GOAL = 2000;
+  const GOAL = activeProfile?.goal || 2000;
   const cartSubtotal = (source) => cart.reduce((sum, id) => sum + priceEstimate(id, source), 0);
   const cheaperStore = ['foodlion', 'harristeeter']
     .map((id) => ({ id, name: id === 'foodlion' ? 'Food Lion' : 'Harris Teeter', total: cartSubtotal(id) }))
@@ -407,6 +412,22 @@ export default function App() {
     .sort((a, b) => a.total - b.total)[0];
 
   const addLog = (entry) => setLog((l) => [{ t: now(), ...entry }, ...l].slice(0, 30));
+  const logMealForActiveProfile = (meal) => {
+    setProfiles((current) => current.map((profile) => profile.id === activeProfileId
+      ? { ...profile, meals: [...profile.meals, meal] }
+      : profile));
+  };
+  const addFamilyProfile = () => {
+    const name = profileNameInput.trim();
+    if (!name) return flash('Enter a name for the profile');
+    if (profiles.length >= 8) return flash('The demo supports up to 8 profiles');
+    const profile = { id: `profile-${Date.now()}`, name, emoji: ['🧑', '👩', '👨', '🧒', '👧', '🧑‍🦱', '🧑‍🦰'][profiles.length - 1] || '🙂', goal: 2000, meals: [] };
+    setProfiles((current) => [...current, profile]);
+    setActiveProfileId(profile.id);
+    setProfileNameInput('');
+    setShowProfileForm(false);
+    flash(`${name}'s profile added`);
+  };
   const mcp = (tool, needed, purpose) => {
     const missing = needed.filter((k) => !scopes[k]);
     const shared = needed.filter((k) => scopes[k]).map((k) => SCOPES.find((s) => s.key === k).label);
@@ -481,7 +502,7 @@ export default function App() {
         return i;
       }).filter((i) => i.qty > 0);
     });
-    if (!m.length) { setMeals((x) => [...x, { name: r.name, cal: r.cal }]); flash(`Logged ${r.cal} cal`); }
+    if (!m.length) { logMealForActiveProfile({ name: r.name, cal: r.cal }); flash(`Logged ${r.cal} cal for ${activeProfile.name}`); }
     else flash('Cooked. Calories not logged (nutrition off)');
   };
 
@@ -498,7 +519,7 @@ export default function App() {
       return { text: `I added ${ids.length} missing ingredients to your cart, including replacements for expired food. Review it in the Order tab. Nothing is purchased until you confirm.` };
     }
 
-    if (/do i have|do we have|is there|how much|how many|is my|are my|still good|still fresh|expired/.test(t) && itemForQuery) {
+    if (/do i have|do you have|do we have|is there|have we got|how much|how many|is my|are my|still good|still fresh|expired/.test(t) && itemForQuery) {
       const needs = ['names'];
       if (/how much|how many|quantity/.test(t)) needs.push('quantity');
       if (/expir|fresh|good|date|last/.test(t)) needs.push('expiry');
@@ -513,7 +534,7 @@ export default function App() {
       return { text: `Yes, ${itemForQuery.name} is in your fridge${itemForQuery.days < 0 ? ', but it is past its listed expiration date' : ''}.` };
     }
 
-    if (/do i have|do we have|what(?:'s| is) (?:in|inside) (?:my|the) fridge|what food do i have|what do i have|show my inventory|list my food|what(?:'s| is) available/.test(t)) {
+    if (/do i have|do you have|do we have|have we got|what(?:'s| is) (?:in|inside) (?:my|the) fridge|what food do i have|what do i have|show my inventory|list my food|what(?:'s| is) available/.test(t)) {
       const needs = ['names'];
       if (/expir|fresh|date|soon/.test(t)) needs.push('expiry');
       if (/how many|quantity|amount/.test(t)) needs.push('quantity');
@@ -538,7 +559,7 @@ export default function App() {
     if (/calor|light|healthy|under/.test(t)) {
       const miss = mcp('recipes.search', ['names', 'nutrition'], 'Low-calorie recipe search');
       if (miss.length) return { text: `I don't have access to "${miss.join(', ')}", so I can't filter by calories.` };
-      return { text: `You've had ${eaten} of ${GOAL} cal. Here are lighter options (350 cal or less):`, recipes: RECIPES.filter((r) => r.cal <= 350) };
+      return { text: `${activeProfile.name} has logged ${eaten} of ${GOAL} cal. Here are lighter options (350 cal or less):`, recipes: RECIPES.filter((r) => r.cal <= 350) };
     }
     if (/expir|soon|waste|use up/.test(t)) {
       const miss = mcp('recipes.search', ['names', 'expiry'], 'Use-it-up recipe search');
@@ -689,7 +710,7 @@ export default function App() {
         <div className="mx-auto flex h-[68px] w-full max-w-[1440px] items-center justify-between gap-4 px-4 md:px-8">
           <button onClick={() => setTab('fridge')} className="flex shrink-0 items-center gap-2.5 text-left">
             <span className="flex h-10 w-10 items-center justify-center rounded-[13px] text-white" style={{ background: BLUE }}><Snowflake size={23} /></span>
-            <span><span className="block text-[17px] font-bold tracking-tight">CoolCam</span><span className="hidden text-[11px] text-[#8E8E93] sm:block">Smart fridge companion</span></span>
+            <span><span className="block text-[17px] font-bold tracking-tight">MyFridge</span><span className="hidden text-[11px] text-[#8E8E93] sm:block">Smart fridge companion</span></span>
           </button>
           <nav className="hidden h-full items-center gap-1 lg:flex" aria-label="Main navigation">
             {tabs.map(([k, Icon, label]) => <button key={k} onClick={() => setTab(k)} className={`flex h-10 items-center gap-2 rounded-[10px] px-3 text-[14px] font-medium transition-colors ${tab === k ? 'bg-[#007AFF]/10 text-[#007AFF]' : 'text-[#6C6C70] hover:bg-black/[0.04]'}`}><Icon size={17} />{label}</button>)}
@@ -703,7 +724,7 @@ export default function App() {
 
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 pb-24 md:px-8 md:py-8 md:pb-10">
           <div className="mb-6 flex items-end justify-between gap-4">
-            <div><div className="mb-1 text-[13px] font-medium text-[#8E8E93]">COOLCAM / {titles[tab].toUpperCase()}</div><h1 className="text-[30px] font-bold tracking-tight md:text-[36px]">{titles[tab]}</h1></div>
+            <div><div className="mb-1 text-[13px] font-medium text-[#8E8E93]">MYFRIDGE / {titles[tab].toUpperCase()}</div><h1 className="text-[30px] font-bold tracking-tight md:text-[36px]">{titles[tab]}</h1></div>
             <div className="hidden items-center gap-2 text-[13px] text-[#6C6C70] sm:flex"><span className="h-2 w-2 rounded-full bg-[#34C759]" />Demo data · saved on this device</div>
           </div>
           {tab === 'fridge' && (
@@ -862,7 +883,24 @@ export default function App() {
                 </div>
               )}
               {aTab === 'cal' && (
-                <div className="px-4 pb-6 space-y-4">
+                <div className="mx-auto max-w-3xl px-4 pb-6 space-y-4 md:px-0">
+                  <section className="rounded-[16px] bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: 'rgba(0,122,255,.10)', color: BLUE }}><Users size={18} /></span><div><h2 className="text-[16px] font-semibold">Family profiles</h2><p className="text-[12px] text-[#6C6C70]">Separate calorie goals and meal logs</p></div></div>
+                      <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'rgba(255,149,0,.15)', color: '#B35F00' }}>PREMIUM</span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {profiles.map((profile) => <button key={profile.id} onClick={() => setActiveProfileId(profile.id)} className="flex items-center gap-2 rounded-full px-3 py-2 text-[13px] font-medium" style={activeProfileId === profile.id ? { background: BLUE, color: '#fff' } : { background: '#F2F2F7', color: '#3A3A3C' }}><span>{profile.emoji}</span>{profile.name}</button>)}
+                      {!showProfileForm && profiles.length < 8 && <button onClick={() => setShowProfileForm(true)} className="flex items-center gap-1 rounded-full border border-dashed border-[#C7C7CC] px-3 py-2 text-[13px] font-medium" style={{ color: BLUE }}><Plus size={15} />Add profile</button>}
+                    </div>
+                    {showProfileForm && <form onSubmit={(event) => { event.preventDefault(); addFamilyProfile(); }} className="mt-3 flex gap-2"><input autoFocus value={profileNameInput} onChange={(event) => setProfileNameInput(event.target.value)} placeholder="Family member's name" maxLength={24} className="min-w-0 flex-1 rounded-[10px] bg-[#F2F2F7] px-3 py-2 text-[14px] outline-none" /><button type="submit" className="rounded-[10px] px-3 py-2 text-[14px] font-semibold text-white" style={{ background: BLUE }}>Add</button><button type="button" onClick={() => { setShowProfileForm(false); setProfileNameInput(''); }} className="rounded-[10px] bg-[#F2F2F7] px-3 py-2 text-[14px]">Cancel</button></form>}
+                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/[0.07] pt-3">
+                      <div><div className="text-[13px] font-medium">{activeProfile.name}’s daily calorie goal</div><div className="text-[11px] text-[#8E8E93]">Adjustable demo target</div></div>
+                      <div className="flex items-center gap-2"><button aria-label="Lower calorie goal" onClick={() => setProfiles((current) => current.map((profile) => profile.id === activeProfileId ? { ...profile, goal: Math.max(800, profile.goal - 100) } : profile))} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2F2F7] text-[#3A3A3C]"><Minus size={15} /></button><strong className="min-w-[82px] text-center text-[14px]">{GOAL} cal</strong><button aria-label="Raise calorie goal" onClick={() => setProfiles((current) => current.map((profile) => profile.id === activeProfileId ? { ...profile, goal: Math.min(5000, profile.goal + 100) } : profile))} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2F2F7] text-[#3A3A3C]"><Plus size={15} /></button></div>
+                    </div>
+                    <p className="mt-3 text-[11px] leading-snug text-[#8E8E93]">Demo only: profiles share one fridge list and separate this session’s calorie logs. They are not separate password-protected accounts.</p>
+                  </section>
+
                   <div className="bg-white rounded-[16px] p-5 flex flex-col items-center">
                     <div className="relative w-[132px] h-[132px]">
                       <svg viewBox="0 0 132 132" className="w-full h-full -rotate-90">
@@ -871,14 +909,14 @@ export default function App() {
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center"><div className="text-[28px] font-bold leading-none">{eaten}</div><div className="text-[12px] text-[#6C6C70] mt-1">of {GOAL} cal</div></div>
                     </div>
-                    <div className="text-[13px] text-[#6C6C70] mt-3">{Math.max(0, GOAL - eaten)} cal remaining today</div>
+                    <div className="text-[13px] text-[#6C6C70] mt-3">{activeProfile.name} · {Math.max(0, GOAL - eaten)} cal remaining today</div>
                   </div>
-                  <Group title="Today">
+                  <Group title={`${activeProfile.name} · Today`}>
                     {meals.map((m, i) => <div key={i} className="flex justify-between px-3 py-3 text-[16px]"><span>{m.name}</span><span className="text-[#6C6C70]">{m.cal} cal</span></div>)}
                   </Group>
                   <div>
                     <div className="px-1 pb-1.5 text-[13px] uppercase text-[#6C6C70] tracking-wide">Quick add</div>
-                    <div className="flex flex-wrap gap-2">{all.filter((i) => i.cal && i.days >= 0).slice(0, 5).map((i) => <button key={i.id} onClick={() => { const m = mcp('nutrition.log_meal', ['nutrition'], 'Quick log ' + i.name); if (!m.length) setMeals([...meals, { name: i.name, cal: i.cal }]); else flash('Nutrition access is off'); }} className="text-[13px] bg-white rounded-full px-3 py-1.5 flex items-center gap-1.5" style={{ color: BLUE }}>{ART[i.kind] ? <FoodIcon kind={i.kind} size={18} /> : i.emoji} {i.name} · {i.cal}</button>)}</div>
+                    <div className="flex flex-wrap gap-2">{all.filter((i) => i.cal && i.days >= 0).slice(0, 5).map((i) => <button key={i.id} onClick={() => { const m = mcp('nutrition.log_meal', ['nutrition'], `Quick log ${i.name} for ${activeProfile.name}`); if (!m.length) logMealForActiveProfile({ name: i.name, cal: i.cal }); else flash('Nutrition access is off'); }} className="text-[13px] bg-white rounded-full px-3 py-1.5 flex items-center gap-1.5" style={{ color: BLUE }}>{ART[i.kind] ? <FoodIcon kind={i.kind} size={18} /> : i.emoji} {i.name} · {i.cal}</button>)}</div>
                   </div>
                 </div>
               )}
@@ -945,7 +983,7 @@ export default function App() {
             <div className="mx-auto max-w-3xl px-4 pb-6 space-y-4 md:px-0">
               <div className="rounded-[20px] p-5 text-white" style={{ background: 'linear-gradient(145deg,#2C2C2E,#000)' }}>
                 <div className="flex justify-between items-start">
-                  <div><div className="text-[22px] font-bold tracking-tight">CoolCam</div><div className="text-[13px] text-white/60 mt-0.5">Wide-angle · door-mounted · voice-activated</div></div>
+                  <div><div className="text-[22px] font-bold tracking-tight">MyFridge</div><div className="text-[13px] text-white/60 mt-0.5">Wide-angle · door-mounted · voice-activated</div></div>
                   <div className="text-[22px] font-semibold">$79.99</div>
                 </div>
                 <div className="text-[13px] text-white/50 mt-4">One-time purchase. Includes the Free app.</div>
@@ -953,7 +991,7 @@ export default function App() {
 
               {[
                 { name: 'Free', price: '$0', cur: !premium, feats: ["See what's in your fridge", 'Expiration tracking and color-coded alerts', 'Add and edit items and dates by hand', 'Alexa, Google Nest and more', 'Voice questions about inventory'] },
-                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI recipes based on what you want', 'AI orders food for you', 'Compare sample basket prices at nearby stores', 'Choose Uber Grocery or DoorDash as your default', 'Calorie tracker'], prem: true },
+                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI recipes based on what you want', 'AI orders food for you', 'Compare sample basket prices at nearby stores', 'Choose Uber Grocery or DoorDash as your default', 'Family profiles with separate calorie goals and meal logs'], prem: true },
               ].map((p) => (
                 <div key={p.name} className="bg-white rounded-[16px] p-4" style={p.cur ? { outline: `2px solid ${BLUE}` } : {}}>
                   <div className="flex justify-between items-center">

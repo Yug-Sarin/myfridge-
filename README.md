@@ -1,6 +1,6 @@
-# CoolCam
+# MyFridge
 
-CoolCam is a school project concept for a fridge camera and companion app. The app source is in [`coolcam-demo/`](coolcam-demo/).
+MyFridge is a school project concept for a fridge camera and companion app. The app source is in [`coolcam-demo/`](coolcam-demo/).
 
 ## Run it in VS Code
 
