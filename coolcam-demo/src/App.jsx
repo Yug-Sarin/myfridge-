@@ -34,6 +34,7 @@ const INITIAL_ITEMS = seed([
   { id: 'yogurt', name: 'Yogurt', emoji: '🥣', qty: 3, unit: 'cups', days: 6, shelf: 2, cal: 120 },
   { id: 'pasta', name: 'Leftover pasta', emoji: '🍝', qty: 1, unit: 'box', days: -2, shelf: 3, cal: 400 },
   { id: 'pepper', name: 'Bell pepper', emoji: '🫑', qty: 2, unit: 'pcs', days: 6, shelf: 2, cal: 30 },
+  { id: 'lemon', name: 'Lemons', emoji: '🍋', qty: 2, unit: 'pcs', days: 12, shelf: 2, cal: 20 },
   { id: 'oj', name: 'Orange juice', emoji: '🧃', qty: 1, unit: 'bottle', days: 7, shelf: 1, cal: 110 },
 ]);
 const SCAN_POOL = seed([
@@ -258,7 +259,7 @@ const FoodIcon = ({ kind, size = 28 }) => {
 const SHELVES = [{ y0: 62, c: -8 }, { y0: 118, c: 0 }, { y0: 172, c: 10 }];
 const boxColor = (d) => (d < 0 ? '#FF3B30' : d === 0 ? '#FFCC00' : '#34C759');
 
-const FridgeScene = ({ items, boxes }) => {
+const FridgeScene = ({ items, boxes, highlightedItemId }) => {
   const placed = SHELVES.flatMap((sh, si) => {
     const row = items.filter((i) => i.shelf === si + 1);
     return row.map((it, k) => {
@@ -322,6 +323,13 @@ const FridgeScene = ({ items, boxes }) => {
                 <text x="0" y="-48.4" fontSize="6.6" fontWeight="700" textAnchor="middle" fill={it.days === 0 ? '#3b2f00' : '#fff'}>{label}</text>
               </g>
             )}
+            {it.id === highlightedItemId && (
+              <g className="locatePulse" pointerEvents="none">
+                <rect x="-24" y="-49" width="48" height="55" rx="7" fill="#C8FF58" fillOpacity=".18" stroke="#DFFF70" strokeWidth="3" />
+                <rect x="-16" y="-62" width="32" height="9" rx="4.5" fill="#1D6B35" />
+                <text x="0" y="-55.5" fontSize="5.5" fontWeight="800" textAnchor="middle" fill="#fff">FOUND</text>
+              </g>
+            )}
           </g>
         );
       })}
@@ -381,6 +389,8 @@ export default function App() {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voice, setVoice] = useState({ listening: false, said: '', reply: '' });
   const recognitionRef = useRef(null);
+  const locateTimeoutRef = useRef(null);
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
   const [aTab, setATab] = useState('chat');
   const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to MyFridge. Ask what is in your fridge, how much of an item you have, what is expiring, recipe ideas, calories, or missing ingredients. Replies use local demo logic; no AI service is connected.' }]);
   const [input, setInput] = useState('');
@@ -597,7 +607,33 @@ export default function App() {
       const ex = sorted.filter((i) => i.days < 0);
       const td = sorted.filter((i) => i.days === 0);
       const so = sorted.filter((i) => i.days >= 1 && i.days <= 3);
-      if (/scan|look at|update the fridge/.test(t)) { scan(true); r = 'Scanning the shelves now. This is a sample scan; no photo is captured.'; }
+      if (/\b(where|find|locate|show me)\b/.test(t)) {
+        const item = all.find((entry) => [entry.name, ...(KEYWORDS[entry.kind] || [])].some((word) => t.includes(word.toLowerCase())));
+        if (!item) {
+          r = 'I can only locate items in the sample fridge list. I do not see that item right now.';
+        } else {
+          const missing = mcp('inventory.locate', ['names'], `Locate ${item.name} in the sample fridge`);
+          if (missing.length) {
+            r = `I can't locate that item because ${missing.join(' and ')} access is turned off in Privacy.`;
+          } else {
+            const shelf = ({ 1: 'top shelf', 2: 'middle shelf', 3: 'bottom shelf' })[item.shelf] || 'fridge';
+            setTab('fridge');
+            if (shutter) {
+              r = `I found ${item.name.toLowerCase()} on the ${shelf}, but the camera shutter is closed, so I can't show the highlight.`;
+            } else {
+              setHighlightedItemId(item.id);
+              if (locateTimeoutRef.current) window.clearTimeout(locateTimeoutRef.current);
+              locateTimeoutRef.current = window.setTimeout(() => {
+                setHighlightedItemId((current) => current === item.id ? null : current);
+                locateTimeoutRef.current = null;
+              }, 3200);
+              setVoiceOpen(false);
+              r = `I found ${item.name.toLowerCase()} on the ${shelf}. I've highlighted it in the camera view for a few seconds.`;
+            }
+          }
+        }
+      }
+      else if (/scan|look at|update the fridge/.test(t)) { scan(true); r = 'Scanning the shelves now. This is a sample scan; no photo is captured.'; }
       else if (/dinner|recipe|meal/.test(t) && !premium) r = 'Recipe ideas are part of Premium. You can still ask me what food is in your fridge.';
       else if (/expir/.test(t)) {
         const missing = mcp('voice.inventory_lookup', ['names', 'expiry'], 'Voice question about expiring food');
@@ -722,7 +758,7 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#F2F2F7] text-[#1C1C1E]" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", system-ui, sans-serif' }}>
-      <style>{`@keyframes scanl{0%{top:0}100%{top:100%}} @keyframes pulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}} @keyframes sheetUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}} .sheetAnim{animation:sheetUp .25s ease-out} ::-webkit-scrollbar{display:none}`}</style>
+      <style>{`@keyframes scanl{0%{top:0}100%{top:100%}} @keyframes pulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}} @keyframes sheetUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}} @keyframes locateGlow{0%,100%{opacity:.58}50%{opacity:1}} .locatePulse{animation:locateGlow .6s ease-in-out 5;filter:drop-shadow(0 0 5px rgba(210,255,80,.9))} .sheetAnim{animation:sheetUp .25s ease-out} ::-webkit-scrollbar{display:none}`}</style>
       <header className="sticky top-0 z-10 shrink-0 border-b border-black/[0.07] bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-[68px] w-full max-w-[1440px] items-center justify-between gap-4 px-4 md:px-8">
           <button onClick={() => setTab('fridge')} className="flex shrink-0 items-center gap-2.5 text-left">
@@ -754,7 +790,7 @@ export default function App() {
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-white/60 text-[14px]"><Lock size={24} /><div className="mt-2">Lens shutter closed</div></div>
                   ) : (
                     <>
-                      <FridgeScene items={all} boxes={boxes} />
+                      <FridgeScene items={all} boxes={boxes} highlightedItemId={highlightedItemId} />
                       {scanning && <div className="absolute left-0 right-0 h-0.5 bg-[#34C759]" style={{ animation: 'scanl 1.6s linear', boxShadow: '0 0 12px 3px #34C759' }} />}
                     </>
                   )}
@@ -1117,7 +1153,7 @@ export default function App() {
               {voice.reply && <button onClick={speakReply} className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold" style={{ color: BLUE }}><Volume2 size={16} />{voice.source === 'microphone' ? 'Replay reply' : 'Hear reply'}</button>}
               <div className="text-[13px] text-[#6C6C70] mt-5 mb-2">Tap the mic and ask a question, or try a sample</div>
               <p className="mb-3 text-[12px] text-[#8E8E93]">Microphone access starts only after you tap. Answers to spoken questions read aloud automatically. Speech recognition depends on your browser and may send audio to its speech service; this demo does not send your voice to an AI service.</p>
-              <div className="flex flex-wrap gap-2">{["What's expiring soon?", 'Do I have milk?', 'Scan the fridge', "What's for dinner?"].map((c) => <button key={c} onClick={() => voiceCmd(c)} className="text-[14px] bg-white rounded-full px-3.5 py-2" style={{ color: BLUE }}>{c}</button>)}</div>
+              <div className="flex flex-wrap gap-2">{["Where are the lemons?", "What's expiring soon?", 'Do I have milk?', 'Scan the fridge', "What's for dinner?"].map((c) => <button key={c} onClick={() => voiceCmd(c)} className="text-[14px] bg-white rounded-full px-3.5 py-2" style={{ color: BLUE }}>{c}</button>)}</div>
             </div>
           </div>
         )}
