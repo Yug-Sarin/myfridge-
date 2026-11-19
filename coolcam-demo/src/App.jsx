@@ -512,6 +512,17 @@ export default function App() {
     }
     setSheet(null);
   };
+  const markItemUsed = () => {
+    const item = items.find((entry) => entry.id === sheet.id);
+    if (!item) return setSheet(null);
+    const remaining = daysLeft(item.exp);
+    if (remaining < 0) return flash('This item is past its listed date. It was not counted as saved.');
+    const value = remaining <= 3 ? (ESTIMATED_UNIT_VALUES[item.kind] || 0) : 0;
+    setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, qty: entry.qty - 1 } : entry).filter((entry) => entry.qty > 0));
+    if (value > 0) setSavedEvents((events) => [{ id: `used-${Date.now()}`, createdAt: Date.now(), recipe: 'Marked used', items: [item.name], value }, ...events]);
+    setSheet(null);
+    flash(value > 0 ? `Marked used · estimated $${value.toFixed(2)} saved from waste` : 'Marked one unit as used');
+  };
   const removeItem = () => {
     setItems((it) => it.filter((i) => i.id !== sheet.id));
     addLog({ tool: 'inventory.remove', purpose: 'You removed "' + sheet.name + '"', shared: [], blocked: ['Stays on device'] });
@@ -885,7 +896,7 @@ export default function App() {
                   <div className="mt-3 space-y-2">
                     {monthlySavings.slice(0, 2).map((event) => <div key={event.id} className="flex items-center justify-between gap-3 text-[12px]"><span className="min-w-0 truncate text-[#6C6C70]">{event.recipe} · {event.items.join(', ')}</span><strong className="shrink-0 text-[#1D8A3A]">+${event.value.toFixed(2)}</strong></div>)}
                   </div>
-                ) : <p className="mt-3 text-[12px] leading-snug text-[#6C6C70]">{premium ? 'Log a meal using food that expires within 3 days to start tracking your estimate.' : 'Unlock Premium to track an estimate when you log meals with food near its expiry date.'}</p>}
+                ) : <p className="mt-3 text-[12px] leading-snug text-[#6C6C70]">Mark an item as used from its details before its listed date to start tracking your estimate.</p>}
                 <p className="mt-3 border-t border-black/[0.06] pt-2 text-[10px] leading-snug text-[#8E8E93]">Estimate uses sample value per quantity used. It is not a live price or guaranteed savings.</p>
               </section>
 
@@ -1173,8 +1184,8 @@ export default function App() {
               </div>
 
               {[
-                { name: 'Free', price: '$0', cur: !premium, feats: ["See what's in your fridge", 'Expiration tracking and color-coded alerts', 'Add and edit items and dates by hand', 'Alexa, Google Nest and more', 'Voice questions about inventory'] },
-                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI Chef with step-by-step cooking and occasion-based recipes', 'Grocery ordering and sample store comparisons', 'Food savings dashboard for items used before expiry', 'Calorie tracking and family profiles'], prem: true },
+                { name: 'Free', price: '$0', cur: !premium, feats: ["See what's in your fridge", 'Expiration tracking and color-coded alerts', 'Food savings dashboard when you mark items as used', 'Add and edit items and dates by hand', 'Alexa, Google Nest and more', 'Voice questions about inventory'] },
+                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI Chef with step-by-step cooking and occasion-based recipes', 'Grocery ordering and sample store comparisons', 'Calorie tracking and family profiles'], prem: true },
               ].map((p) => (
                 <div key={p.name} className="bg-white rounded-[16px] p-4" style={p.cur ? { outline: `2px solid ${BLUE}` } : {}}>
                   <div className="flex justify-between items-center">
@@ -1262,7 +1273,10 @@ export default function App() {
                 </Group>
 
                 {sheet.mode === 'edit' && (
-                  <button onClick={removeItem} className="w-full bg-white rounded-[12px] py-3 text-[17px] flex items-center justify-center gap-1.5" style={{ color: '#FF3B30' }}><Trash2 size={17} />Remove item</button>
+                  <>
+                    <button onClick={markItemUsed} disabled={sheetDays < 0} className="w-full bg-white rounded-[12px] py-3 text-[16px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40" style={{ color: '#1D8A3A' }}><Check size={17} />Mark one unit as used</button>
+                    <button onClick={removeItem} className="w-full bg-white rounded-[12px] py-3 text-[17px] flex items-center justify-center gap-1.5" style={{ color: '#FF3B30' }}><Trash2 size={17} />Remove item</button>
+                  </>
                 )}
               </div>
             </div>
