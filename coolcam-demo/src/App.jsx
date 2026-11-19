@@ -59,6 +59,16 @@ const RECIPES = [
   { name: 'Berry Yogurt Parfait', emoji: '🍓', time: 5, cal: 210, ing: ['yogurt', 'berries'] },
   { name: 'Chicken Pasta Bake', emoji: '🍝', time: 35, cal: 560, ing: ['chicken', 'pasta', 'tomato', 'cheese'] },
 ];
+const CHEF_RECIPES = [
+  { name: 'Spinach & Cheese Omelet', emoji: '🍳', time: 10, serves: 1, categories: ['Popular', 'Quick meals', 'Appetizers'], ingredients: [{ name: 'Eggs', kind: 'eggs' }, { name: 'Spinach', kind: 'spinach' }, { name: 'Cheddar', kind: 'cheese' }], steps: ['Whisk the eggs with a pinch of salt and pepper until the yolks and whites are blended.', 'Warm a lightly oiled pan over medium-low heat. Add the spinach and cook until just wilted.', 'Pour in the eggs. Gently pull the cooked edges toward the center as the eggs set.', 'Add cheddar, fold the omelet in half, and cook until the center is just set.'] },
+  { name: 'Lemon Chicken Skillet', emoji: '🍋', time: 25, serves: 2, categories: ['Popular', 'Quick meals'], ingredients: [{ name: 'Chicken breast', kind: 'chicken' }, { name: 'Spinach', kind: 'spinach' }, { name: 'Bell pepper', kind: 'pepper' }, { name: 'Lemon', kind: 'lemon' }], steps: ['Pat the chicken dry, then season both sides with salt and pepper.', 'Heat a little oil in a skillet over medium heat. Cook chicken until browned and fully cooked through.', 'Move the chicken to a clean plate. Add sliced pepper and cook until tender.', 'Stir in spinach and lemon juice. Return chicken to the pan and spoon the vegetables over it.'] },
+  { name: 'Berry Yogurt Parfait', emoji: '🍓', time: 5, serves: 1, categories: ['Popular', 'Desserts', 'Quick meals'], ingredients: [{ name: 'Yogurt', kind: 'yogurt' }, { name: 'Strawberries', kind: 'berries' }], steps: ['Rinse the strawberries and remove their leafy tops.', 'Slice the berries into bite-size pieces.', 'Layer yogurt and berries in a glass or bowl.', 'Finish with a little honey or granola if you have some.'] },
+  { name: 'Tomato Basil Crostini', emoji: '🥖', time: 15, serves: 4, categories: ['Appetizers', 'Party food'], ingredients: [{ name: 'Tomatoes', kind: 'tomato' }, { name: 'Cheddar', kind: 'cheese' }, { name: 'Fresh basil', kind: 'basil' }], steps: ['Dice the tomatoes and finely chop the basil.', 'Toast slices of bread until crisp at the edges.', 'Top each slice with tomato and a little cheese.', 'Add basil and serve right away.'] },
+  { name: 'Crunchy Party Veggie Board', emoji: '🥕', time: 15, serves: 6, categories: ['Popular', 'Party food', 'Appetizers'], ingredients: [{ name: 'Bell pepper', kind: 'pepper' }, { name: 'Spinach', kind: 'spinach' }, { name: 'Yogurt dip', kind: 'yogurt' }], steps: ['Wash the vegetables and pat them dry.', 'Slice the pepper into easy-to-grab strips.', 'Stir a pinch of salt and lemon juice into yogurt for a quick dip.', 'Arrange everything on a platter, keeping the dip in a small bowl in the center.'] },
+  { name: 'Birthday Berry Yogurt Cups', emoji: '🎂', time: 10, serves: 4, categories: ['Popular', 'Birthdays', 'Desserts'], ingredients: [{ name: 'Yogurt', kind: 'yogurt' }, { name: 'Strawberries', kind: 'berries' }, { name: 'Lemon', kind: 'lemon' }], steps: ['Rinse and slice the strawberries.', 'Spoon yogurt into small cups or glasses.', 'Add a layer of strawberries and a tiny squeeze of lemon.', 'Repeat the layers and finish with a berry on top. Chill until ready to serve.'] },
+  { name: 'Mini Spinach Egg Bites', emoji: '🧁', time: 22, serves: 6, categories: ['Appetizers', 'Party food', 'Birthdays'], ingredients: [{ name: 'Eggs', kind: 'eggs' }, { name: 'Spinach', kind: 'spinach' }, { name: 'Cheddar', kind: 'cheese' }], steps: ['Heat the oven to 350°F (175°C) and lightly grease a muffin tin.', 'Whisk the eggs, then stir in chopped spinach and shredded cheddar.', 'Divide the mixture among the muffin cups, filling each about two-thirds full.', 'Bake until puffed and fully set in the center, about 15–18 minutes. Cool briefly before serving.'] },
+  { name: 'Lemon Berry Celebration Cups', emoji: '🍋', time: 12, serves: 4, categories: ['Birthdays', 'Desserts'], ingredients: [{ name: 'Yogurt', kind: 'yogurt' }, { name: 'Strawberries', kind: 'berries' }, { name: 'Lemon', kind: 'lemon' }], steps: ['Spoon yogurt into four small serving cups.', 'Add sliced strawberries and a little lemon zest or juice.', 'Add another spoonful of yogurt and top with extra berries.', 'Chill the cups before serving; add sprinkles if available.'] },
+];
 const CATALOG = {
   lemon: { name: 'Lemons', price: 0.79, emoji: '🍋' },
   basil: { name: 'Fresh basil', price: 2.49, emoji: '🌿' },
@@ -398,6 +408,9 @@ export default function App() {
   const locateTimeoutRef = useRef(null);
   const [highlightedItemId, setHighlightedItemId] = useState(null);
   const [aTab, setATab] = useState('chat');
+  const [chefCategory, setChefCategory] = useState('Popular');
+  const [activeChefRecipe, setActiveChefRecipe] = useState(null);
+  const [chefStep, setChefStep] = useState(0);
   const [chat, setChat] = useState([{ from: 'ai', text: 'Welcome to MyFridge. Ask what is in your fridge, how much of an item you have, what is expiring, recipe ideas, calories, or missing ingredients. Replies use local demo logic; no AI service is connected.' }]);
   const [input, setInput] = useState('');
   const [cart, setCart] = useState([]);
@@ -910,14 +923,14 @@ export default function App() {
             <div className="px-8 pt-16 text-center">
               <div className="w-[72px] h-[72px] mx-auto rounded-[18px] flex items-center justify-center text-white" style={{ background: 'linear-gradient(135deg,#FF9F0A,#FF375F)' }}><Sparkles size={34} /></div>
               <h3 className="font-bold text-[22px] mt-5">Meet your fridge assistant</h3>
-              <p className="text-[15px] text-[#6C6C70] mt-2 leading-snug">AI recipes from what you have, automatic food ordering, and a calorie tracker.</p>
+              <p className="text-[15px] text-[#6C6C70] mt-2 leading-snug">Guided cooking, recipes for every occasion, grocery planning, and a calorie tracker.</p>
               <button onClick={() => { setPremium(true); flash('Premium unlocked (demo)'); }} className="mt-6 w-full py-3.5 rounded-[14px] text-white font-semibold text-[17px]" style={{ background: BLUE }}>Try Premium · $10/month</button>
               <p className="text-[12px] text-[#8E8E93] mt-3">Cancel anytime. Demo only.</p>
             </div>
           ) : (
             <div className="min-h-full flex flex-col">
               <div className="px-4 pb-3">
-                <Segmented value={aTab} onChange={setATab} options={[['chat', 'Recipes', ChefHat], ['order', cart.length ? `Order (${cart.length})` : 'Order', ShoppingCart], ['cal', 'Calories', Flame]]} />
+                <Segmented value={aTab} onChange={setATab} options={[['chat', 'Recipes', ChefHat], ['chef', 'AI Chef', Sparkles], ['order', cart.length ? `Order (${cart.length})` : 'Order', ShoppingCart], ['cal', 'Calories', Flame]]} />
               </div>
               {aTab === 'chat' && (
                 <div className="flex-1 flex flex-col">
@@ -938,6 +951,64 @@ export default function App() {
                     <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send(input)} placeholder="Ask for a recipe" className="flex-1 bg-white rounded-full px-4 py-2.5 text-[15px] outline-none" />
                     <button onClick={() => send(input)} className="w-9 h-9 rounded-full text-white flex items-center justify-center" style={{ background: BLUE }}><ArrowUp size={18} /></button>
                   </div>
+                </div>
+              )}
+              {aTab === 'chef' && (
+                <div className="mx-auto w-full max-w-4xl px-4 pb-6 md:px-0">
+                  <section className="overflow-hidden rounded-[20px] text-white" style={{ background: 'linear-gradient(130deg,#3B2F70,#6B4EFF 55%,#B177FF)' }}>
+                    <div className="p-5 md:p-7">
+                      <div className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[.14em] text-white/75"><Sparkles size={15} /> MyFridge AI Chef</div>
+                      <h2 className="max-w-xl text-[25px] font-bold leading-tight md:text-[30px]">Find something delicious, then cook it one step at a time.</h2>
+                      <p className="mt-2 max-w-xl text-[13px] leading-snug text-white/75">Popular ideas for weeknights, parties, desserts, and birthdays. Ingredient badges show what’s already in your fridge.</p>
+                    </div>
+                  </section>
+
+                  {activeChefRecipe ? (
+                    <div className="mt-4 space-y-4">
+                      <button onClick={() => { setActiveChefRecipe(null); setChefStep(0); }} className="text-[14px] font-semibold" style={{ color: BLUE }}>‹ Back to recipes</button>
+                      <section className="rounded-[18px] bg-white p-4 md:p-6">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#F2F2F7] text-[28px]">{activeChefRecipe.emoji}</span>
+                          <div className="min-w-0 flex-1"><h2 className="text-[20px] font-bold leading-tight">{activeChefRecipe.name}</h2><p className="mt-1 text-[13px] text-[#6C6C70]">{activeChefRecipe.time} min · serves {activeChefRecipe.serves} · demo recipe</p></div>
+                        </div>
+                        <div className="mt-5">
+                          <div className="mb-2 flex items-center justify-between text-[12px] font-medium text-[#6C6C70]"><span>Step {chefStep + 1} of {activeChefRecipe.steps.length}</span><span>{Math.round(((chefStep + 1) / activeChefRecipe.steps.length) * 100)}%</span></div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-[#F2F2F7]"><div className="h-full rounded-full transition-all" style={{ width: `${((chefStep + 1) / activeChefRecipe.steps.length) * 100}%`, background: '#7657E8' }} /></div>
+                          <div className="mt-5 min-h-[130px] rounded-[16px] bg-[#F7F5FF] p-5">
+                            <div className="mb-2 text-[12px] font-bold uppercase tracking-[.12em]" style={{ color: '#7657E8' }}>Step {chefStep + 1}</div>
+                            <p className="text-[18px] font-medium leading-relaxed">{activeChefRecipe.steps[chefStep]}</p>
+                          </div>
+                          <div className="mt-4 flex gap-2">
+                            <button disabled={chefStep === 0} onClick={() => setChefStep((step) => Math.max(0, step - 1))} className="flex-1 rounded-[12px] bg-[#F2F2F7] py-3 text-[14px] font-semibold disabled:opacity-40">Previous</button>
+                            {chefStep < activeChefRecipe.steps.length - 1
+                              ? <button onClick={() => setChefStep((step) => step + 1)} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: '#7657E8' }}>Next step</button>
+                              : <button onClick={() => { setActiveChefRecipe(null); setChefStep(0); flash('Recipe complete — enjoy!'); }} className="flex-1 rounded-[12px] py-3 text-[14px] font-semibold text-white" style={{ background: '#1D8A3A' }}>Finish cooking</button>}
+                          </div>
+                        </div>
+                      </section>
+                      <section className="rounded-[18px] bg-white p-4">
+                        <h3 className="text-[15px] font-semibold">Ingredients</h3>
+                        <div className="mt-3 flex flex-wrap gap-2">{activeChefRecipe.ingredients.map((ingredient) => { const inFridge = have(ingredient.kind); return <span key={ingredient.kind} className="rounded-full px-3 py-1.5 text-[12px] font-medium" style={inFridge ? { background: 'rgba(52,199,89,.14)', color: '#1D8A3A' } : { background: '#F2F2F7', color: '#6C6C70' }}>{inFridge ? '✓ ' : '○ '}{ingredient.name}</span>; })}</div>
+                        <p className="mt-3 text-[11px] text-[#8E8E93]">Green means listed in your fridge. Any missing pantry ingredients are for the demo recipe.</p>
+                      </section>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-4 flex gap-2 overflow-x-auto pb-2">{['Popular', 'Appetizers', 'Party food', 'Desserts', 'Birthdays', 'Quick meals'].map((category) => <button key={category} onClick={() => setChefCategory(category)} className="shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold" style={chefCategory === category ? { background: '#7657E8', color: '#fff' } : { background: '#fff', color: '#5E596C' }}>{category}</button>)}</div>
+                      <div className="mb-3 mt-3 flex items-end justify-between"><div><h2 className="text-[19px] font-bold">{chefCategory === 'Popular' ? 'Popular right now' : chefCategory}</h2><p className="mt-0.5 text-[12px] text-[#8E8E93]">Picked to be easy to browse and cook along with</p></div><span className="text-[11px] text-[#8E8E93]">{CHEF_RECIPES.filter((recipe) => recipe.categories.includes(chefCategory)).length} ideas</span></div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {CHEF_RECIPES.filter((recipe) => recipe.categories.includes(chefCategory)).map((recipe) => {
+                          const available = recipe.ingredients.filter((ingredient) => have(ingredient.kind)).length;
+                          return <article key={recipe.name} className="rounded-[18px] bg-white p-4 shadow-sm">
+                            <div className="flex items-start gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[#F5F2FF] text-[28px]">{recipe.emoji}</span><div className="min-w-0 flex-1"><div className="flex flex-wrap gap-1">{recipe.categories.includes('Popular') && <span className="rounded-full bg-[#FFF4DB] px-2 py-0.5 text-[10px] font-bold text-[#9B6810]">POPULAR</span>}<span className="rounded-full bg-[#F2F2F7] px-2 py-0.5 text-[10px] font-semibold text-[#6C6C70]">{recipe.time} min</span></div><h3 className="mt-1 text-[16px] font-semibold leading-tight">{recipe.name}</h3><p className="mt-1 text-[12px] text-[#8E8E93]">{recipe.serves} servings · {available}/{recipe.ingredients.length} fridge ingredients</p></div></div>
+                            <div className="mt-3 flex flex-wrap gap-1">{recipe.ingredients.slice(0, 4).map((ingredient) => <span key={ingredient.kind} className="rounded-full px-2 py-1 text-[10px]" style={have(ingredient.kind) ? { background: 'rgba(52,199,89,.12)', color: '#1D8A3A' } : { background: '#F2F2F7', color: '#8E8E93' }}>{ingredient.name}</span>)}</div>
+                            <button onClick={() => { setActiveChefRecipe(recipe); setChefStep(0); }} className="mt-4 w-full rounded-[12px] py-2.5 text-[14px] font-semibold text-white" style={{ background: '#7657E8' }}>Cook step by step <ChevronRight size={15} className="ml-1 inline" /></button>
+                          </article>;
+                        })}
+                      </div>
+                      <p className="mt-4 text-center text-[11px] text-[#8E8E93]">School demo: these are built-in sample recipes, not generated by a connected AI.</p>
+                    </>
+                  )}
                 </div>
               )}
               {aTab === 'order' && (
@@ -1103,7 +1174,7 @@ export default function App() {
 
               {[
                 { name: 'Free', price: '$0', cur: !premium, feats: ["See what's in your fridge", 'Expiration tracking and color-coded alerts', 'Add and edit items and dates by hand', 'Alexa, Google Nest and more', 'Voice questions about inventory'] },
-                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI recipes based on what you want', 'Grocery ordering and sample store comparisons', 'Food savings dashboard for items used before expiry', 'Calorie tracking and family profiles'], prem: true },
+                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI Chef with step-by-step cooking and occasion-based recipes', 'Grocery ordering and sample store comparisons', 'Food savings dashboard for items used before expiry', 'Calorie tracking and family profiles'], prem: true },
               ].map((p) => (
                 <div key={p.name} className="bg-white rounded-[16px] p-4" style={p.cur ? { outline: `2px solid ${BLUE}` } : {}}>
                   <div className="flex justify-between items-center">
