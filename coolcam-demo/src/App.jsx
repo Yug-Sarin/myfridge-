@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store, Users } from 'lucide-react';
+import { Snowflake, Camera, Mic, ShieldCheck, Sparkles, Wifi, Crown, ArrowUp, X, Lock, Check, ShoppingCart, ChefHat, Flame, Bell, Eye, Plus, Minus, Trash2, AlertTriangle, Clock, ChevronRight, Volume2, Store, Users, TrendingUp } from 'lucide-react';
 
 // ---------- date helpers ----------
 const pad = (n) => String(n).padStart(2, '0');
@@ -74,14 +74,18 @@ const CATALOG = {
   pepper: { name: 'Bell peppers', price: 2.99, emoji: '🫑' },
 };
 const ORDER_PROVIDERS = [
-  { id: 'uber', name: 'Uber Grocery', note: 'Delivery app' },
-  { id: 'doordash', name: 'DoorDash', note: 'Delivery app' },
+  { id: 'doordash', name: 'DoorDash', note: 'Grocery delivery varies by area' },
+  { id: 'instacart', name: 'Instacart', note: 'Grocery delivery varies by area' },
+  { id: 'walmart', name: 'Walmart Delivery', note: 'Walmart grocery delivery' },
+  { id: 'shipt', name: 'Shipt', note: 'Same-day delivery in supported areas' },
+  { id: 'ubereats', name: 'Uber Eats', note: 'Grocery delivery varies by area' },
 ];
 const STORE_OPTIONS = [
   { id: 'foodlion', name: 'Food Lion' },
   { id: 'harristeeter', name: 'Harris Teeter' },
 ];
-const PRICE_FACTORS = { uber: 1.16, doordash: 1.11, foodlion: 0.91, harristeeter: 1.02 };
+const PRICE_FACTORS = { doordash: 1.11, instacart: 1.14, walmart: 1.00, shipt: 1.12, ubereats: 1.13, foodlion: 0.91, harristeeter: 1.02 };
+const ESTIMATED_UNIT_VALUES = { milk: 3.99, eggs: 0.32, spinach: 3.49, chicken: 4.50, cheese: 4.29, tomato: 0.80, yogurt: 1.12, pasta: 1.99, pepper: 1.00, lemon: 0.40, oj: 3.99, berries: 4.99, butter: 0.75, basil: 2.49 };
 const priceEstimate = (id, source) => {
   const seedValue = [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   const variation = ((seedValue % 7) - 3) * 0.018;
@@ -396,8 +400,9 @@ export default function App() {
   const [input, setInput] = useState('');
   const [cart, setCart] = useState([]);
   const [ordered, setOrdered] = useState(false);
-  const [orderProvider, setOrderProvider] = useState('uber');
+  const [orderProvider, setOrderProvider] = useState('doordash');
   const [compareStores, setCompareStores] = useState(true);
+  const [savedEvents, setSavedEvents] = useState([]);
   const [profiles, setProfiles] = useState([{ id: 'you', name: 'You', emoji: '🙂', goal: 2000, meals: [{ name: 'Oatmeal', cal: 300 }] }]);
   const [activeProfileId, setActiveProfileId] = useState('you');
   const [showProfileForm, setShowProfileForm] = useState(false);
@@ -415,6 +420,13 @@ export default function App() {
   const meals = activeProfile?.meals || [];
   const eaten = meals.reduce((s, m) => s + m.cal, 0);
   const GOAL = activeProfile?.goal || 2000;
+  const thisMonth = new Date();
+  const monthlySavings = savedEvents.filter((event) => {
+    const date = new Date(event.createdAt);
+    return date.getMonth() === thisMonth.getMonth() && date.getFullYear() === thisMonth.getFullYear();
+  });
+  const savedValueThisMonth = monthlySavings.reduce((sum, event) => sum + event.value, 0);
+  const savedItemsThisMonth = monthlySavings.reduce((sum, event) => sum + event.items.length, 0);
   const cartSubtotal = (source) => cart.reduce((sum, id) => sum + priceEstimate(id, source), 0);
   const cheaperStore = ['foodlion', 'harristeeter']
     .map((id) => ({ id, name: id === 'foodlion' ? 'Food Lion' : 'Harris Teeter', total: cartSubtotal(id) }))
@@ -505,6 +517,15 @@ export default function App() {
   };
   const cook = (r) => {
     const m = mcp('nutrition.log_meal', ['nutrition'], 'Log "' + r.name + '"');
+    const usedKinds = new Set();
+    const savedItems = items.filter((i) => {
+      const remaining = daysLeft(i.exp);
+      if (!i.kind || !r.ing.includes(i.kind) || usedKinds.has(i.kind) || i.qty <= 0 || remaining < 0 || remaining > 3) return false;
+      usedKinds.add(i.kind);
+      return true;
+    });
+    const savedValue = savedItems.reduce((sum, i) => sum + (ESTIMATED_UNIT_VALUES[i.kind] || 0), 0);
+    if (savedItems.length) setSavedEvents((events) => [{ id: `saved-${Date.now()}`, createdAt: Date.now(), recipe: r.name, items: savedItems.map((i) => i.name), value: Number(savedValue.toFixed(2)) }, ...events]);
     setItems((it) => {
       const used = new Set();
       return it.map((i) => {
@@ -512,8 +533,9 @@ export default function App() {
         return i;
       }).filter((i) => i.qty > 0);
     });
-    if (!m.length) { logMealForActiveProfile({ name: r.name, cal: r.cal }); flash(`Logged ${r.cal} cal for ${activeProfile.name}`); }
-    else flash('Cooked. Calories not logged (nutrition off)');
+    const savingsNote = savedValue > 0 ? ` Est. $${savedValue.toFixed(2)} of food value used before expiry.` : '';
+    if (!m.length) { logMealForActiveProfile({ name: r.name, cal: r.cal }); flash(`Logged ${r.cal} cal for ${activeProfile.name}.${savingsNote}`); }
+    else flash(`Cooked. Calories not logged (nutrition off).${savingsNote}`);
   };
 
   const assistantReply = (q) => {
@@ -817,6 +839,26 @@ export default function App() {
                 </Group>
               )}
 
+              <section className="rounded-[18px] border border-[#DCEBD8] bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: 'rgba(52,199,89,.13)', color: '#1D8A3A' }}><TrendingUp size={18} /></span>
+                    <div><h2 className="text-[16px] font-semibold">Food savings</h2><p className="text-[12px] text-[#6C6C70]">Estimated for {thisMonth.toLocaleDateString([], { month: 'long' })}</p></div>
+                  </div>
+                  <strong className="text-[23px] tracking-tight" style={{ color: '#1D8A3A' }}>${savedValueThisMonth.toFixed(2)}</strong>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-[12px] bg-[#F4F8F2] p-3"><div className="text-[19px] font-semibold">{savedItemsThisMonth}</div><div className="text-[11px] text-[#6C6C70]">items used before expiry</div></div>
+                  <div className="rounded-[12px] bg-[#F4F8F2] p-3"><div className="text-[19px] font-semibold">{monthlySavings.length}</div><div className="text-[11px] text-[#6C6C70]">meals logged</div></div>
+                </div>
+                {monthlySavings.length ? (
+                  <div className="mt-3 space-y-2">
+                    {monthlySavings.slice(0, 2).map((event) => <div key={event.id} className="flex items-center justify-between gap-3 text-[12px]"><span className="min-w-0 truncate text-[#6C6C70]">{event.recipe} · {event.items.join(', ')}</span><strong className="shrink-0 text-[#1D8A3A]">+${event.value.toFixed(2)}</strong></div>)}
+                  </div>
+                ) : <p className="mt-3 text-[12px] leading-snug text-[#6C6C70]">{premium ? 'Log a meal using food that expires within 3 days to start tracking your estimate.' : 'Unlock Premium to track an estimate when you log meals with food near its expiry date.'}</p>}
+                <p className="mt-3 border-t border-black/[0.06] pt-2 text-[10px] leading-snug text-[#8E8E93]">Estimate uses sample value per quantity used. It is not a live price or guaranteed savings.</p>
+              </section>
+
               {/* legend */}
               <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[12px] text-[#6C6C70]">
                 {[['#FF3B30', 'Expired'], ['#FFCC00', 'Today'], ['#FF9500', '1–2 days'], ['#9BD02B', '3–5 days'], ['#34C759', '6+ days']].map(([c, l]) => <span key={l} className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: c }} />{l}</span>)}
@@ -885,7 +927,7 @@ export default function App() {
                 <div className="mx-auto max-w-3xl px-4 pb-6 space-y-4 md:px-0">
                   <section className="rounded-[16px] bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div><h2 className="text-[17px] font-semibold">Shopping preferences</h2><p className="mt-1 text-[13px] text-[#6C6C70]">Pick your default grocery delivery app.</p></div>
+                      <div><h2 className="text-[17px] font-semibold">Shopping preferences</h2><p className="mt-1 text-[13px] text-[#6C6C70]">Pick your preferred grocery delivery service.</p></div>
                       <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ background: 'rgba(255,149,0,.15)', color: '#B35F00' }}>PREMIUM</span>
                     </div>
                     <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -913,7 +955,7 @@ export default function App() {
                           return <div key={store.id} className="flex items-center gap-3 rounded-[12px] bg-white p-3"><span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#F2F2F7] text-[#59636E]"><Store size={17} /></span><span className="min-w-0 flex-1"><span className="block text-[14px] font-semibold">{store.name}</span><span className="block text-[12px] text-[#8E8E93]">{saves ? `$${(cartSubtotal(orderProvider) - total).toFixed(2)} less` : 'No savings on this basket'}</span></span><strong className="text-[15px]">${total.toFixed(2)}</strong></div>;
                         })}
                       </div>
-                      <p className="mt-3 text-[11px] leading-snug text-[#6C6C70]">Illustrative estimates only. Live store pricing, delivery fees, taxes, and ordering integrations are not connected.</p>
+                      <p className="mt-3 text-[11px] leading-snug text-[#6C6C70]">Sample item estimates only. Providers and store availability depend on your address. Live prices, delivery fees, taxes, and ordering integrations are not connected.</p>
                     </section>
                   )}
 
@@ -1044,7 +1086,7 @@ export default function App() {
 
               {[
                 { name: 'Free', price: '$0', cur: !premium, feats: ["See what's in your fridge", 'Expiration tracking and color-coded alerts', 'Add and edit items and dates by hand', 'Alexa, Google Nest and more', 'Voice questions about inventory'] },
-                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI recipes based on what you want', 'AI orders food for you', 'Compare sample basket prices at nearby stores', 'Choose Uber Grocery or DoorDash as your default', 'Family profiles with separate calorie goals and meal logs'], prem: true },
+                { name: 'Premium', price: '$10/mo', cur: premium, feats: ['Everything in Free', 'AI recipes based on what you want', 'Grocery ordering and sample store comparisons', 'Food savings dashboard for items used before expiry', 'Calorie tracking and family profiles'], prem: true },
               ].map((p) => (
                 <div key={p.name} className="bg-white rounded-[16px] p-4" style={p.cur ? { outline: `2px solid ${BLUE}` } : {}}>
                   <div className="flex justify-between items-center">
