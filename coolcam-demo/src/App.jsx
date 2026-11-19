@@ -614,6 +614,7 @@ export default function App() {
         r = answer.recipes?.length ? `${answer.text} ${answer.recipes.map((recipe) => recipe.name).join('. ')}` : answer.text;
       }
       setVoice({ listening: false, processing: false, said: cmd, reply: r, source });
+      if (source === 'microphone') speakText(r);
     }, source === 'preset' ? 900 : 350);
   };
   const startListening = () => {
@@ -669,10 +670,26 @@ export default function App() {
     setVoiceOpen(false);
     setVoice((current) => ({ ...current, listening: false, processing: false }));
   };
+  const speakText = (text) => {
+    if (!text || !('speechSynthesis' in window)) return false;
+    const speech = window.speechSynthesis;
+    const voices = speech.getVoices();
+    const englishVoices = voices.filter((candidate) => candidate.lang?.toLowerCase().startsWith('en'));
+    const friendlyVoice = englishVoices.find((candidate) => /samantha|ava|jenny|aria|karen|monica|google us english|natural|enhanced/i.test(candidate.name))
+      || englishVoices.find((candidate) => candidate.default)
+      || englishVoices[0];
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.96;
+    utterance.pitch = 1.08;
+    utterance.volume = 1;
+    if (friendlyVoice) utterance.voice = friendlyVoice;
+    speech.cancel();
+    speech.speak(utterance);
+    return true;
+  };
   const speakReply = () => {
-    if (!voice.reply || !('speechSynthesis' in window)) return flash('Audio playback is not available in this browser');
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(voice.reply));
+    if (!speakText(voice.reply)) return flash('Audio playback is not available in this browser');
   };
 
   const RecipeCard = ({ r }) => {
@@ -1097,9 +1114,9 @@ export default function App() {
               {voice.listening && <div className="text-[14px] text-center text-[#8E8E93] mt-1">{voice.source === 'microphone' ? 'Listening…' : 'Running sample command…'}</div>}
               {voice.processing && <div className="text-[14px] text-center text-[#8E8E93] mt-1">Checking your fridge list…</div>}
               {voice.reply && <div className="bg-white rounded-[14px] p-3.5 text-[15px] mt-3 leading-snug">{voice.reply}</div>}
-              {voice.reply && <button onClick={speakReply} className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold" style={{ color: BLUE }}><Volume2 size={16} />Hear reply</button>}
+              {voice.reply && <button onClick={speakReply} className="mx-auto mt-3 flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-semibold" style={{ color: BLUE }}><Volume2 size={16} />{voice.source === 'microphone' ? 'Replay reply' : 'Hear reply'}</button>}
               <div className="text-[13px] text-[#6C6C70] mt-5 mb-2">Tap the mic and ask a question, or try a sample</div>
-              <p className="mb-3 text-[12px] text-[#8E8E93]">Microphone access starts only after you tap. Speech recognition depends on your browser and may send audio to its speech service. This demo does not send your voice to an AI service.</p>
+              <p className="mb-3 text-[12px] text-[#8E8E93]">Microphone access starts only after you tap. Answers to spoken questions read aloud automatically. Speech recognition depends on your browser and may send audio to its speech service; this demo does not send your voice to an AI service.</p>
               <div className="flex flex-wrap gap-2">{["What's expiring soon?", 'Do I have milk?', 'Scan the fridge', "What's for dinner?"].map((c) => <button key={c} onClick={() => voiceCmd(c)} className="text-[14px] bg-white rounded-full px-3.5 py-2" style={{ color: BLUE }}>{c}</button>)}</div>
             </div>
           </div>
